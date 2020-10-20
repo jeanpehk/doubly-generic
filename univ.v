@@ -1,4 +1,7 @@
-Require Import List.
+From Coq Require Import List.
+
+Set Implicit Arguments.
+Set Asymmetric Patterns.
 
 (* Universe definition. *)
 
@@ -70,14 +73,14 @@ Definition envtl (k : kind) (G : ctx) (en : env (k :: G)) : env G :=
   | econs _ _ _ G' => G'
   end.
 
-(* lookup a kind from env *)
+(* lookup a type from env *)
 Fixpoint slookup (k : kind) (G : ctx) (tv : tyvar G k) : env G -> decodeKind k :=
   match tv in tyvar G k return env G -> decodeKind k with
   | Vz _ _ => fun env =>
                  match env in env G with
                  | econs _ _ v G => v
                  end
-  | Vs _ _ _ x => fun env => slookup _ _ x (envtl _ _ env)
+  | Vs _ _ _ x => fun env => slookup x (envtl env)
   end.
 
 (* hmm if you do '.. : typ G k -> env G ..' instead      *)
@@ -85,47 +88,48 @@ Fixpoint slookup (k : kind) (G : ctx) (tv : tyvar G k) : env G -> decodeKind k :
 Fixpoint decodeType (k : kind) (G : ctx) (t : typ G k) : env G -> decodeKind k := 
   match t in typ G k return env G -> decodeKind k with
   | Var _ _ x => fun e =>
-                   slookup _ _ x e
+                   slookup x e
   | Lam _ _ _ t1 => fun e =>
-                      fun y => decodeType _ _ t1 (econs _ _ y e)
+                      fun y => decodeType t1 (econs _ y e)
   | App _ _ _ t1 t2 => fun e =>
-                         (decodeType _ _ t1 e) (decodeType _ _ t2 e)
-  | Con _ k' c => fun e =>
-                   decodeConst k' c
+                         (decodeType t1 e) (decodeType t2 e)
+  | Con _ _ c => fun e =>
+                   decodeConst c
   end.
 
 (* decode a closed type *)
-Definition decodeClosed (k : kind) (t : ty k) : decodeKind k :=
-  decodeType _ _ t enil.
+Definition decodeClosed (k : kind)
+  : ty k -> decodeKind k :=
+  fun t => decodeType t enil.
 
 (********* Examples: *********)
 
 (* Shorthands for constants *)
-Definition tnat := Con nil _ Nat.
-Definition tunit := Con nil _ Unit.
-Definition tsum := Con nil _ Sum.
-Definition tprod := Con nil _ Prod.
+Definition tnat := Con nil Nat.
+Definition tunit := Con nil Unit.
+Definition tsum := Con nil Sum.
+Definition tprod := Con nil Prod.
 
 (* Shorthands for constants in a context *)
-Definition tnatc := fun ctx => Con ctx _ Nat.
-Definition tunitc := fun ctx => Con ctx _ Unit.
-Definition tsumc := fun ctx => Con ctx _ Sum.
-Definition tprodc := fun ctx => Con ctx _ Prod.
+Definition tnatc := fun ctx => Con ctx Nat.
+Definition tunitc := fun ctx => Con ctx Unit.
+Definition tsumc := fun ctx => Con ctx Sum.
+Definition tprodc := fun ctx => Con ctx Prod.
 
 (* Shorthands for other types *)
 Definition tmaybe : ty (F Ty Ty) :=
-  Lam _ _ _ (App _ _ _ (App _ _ _ (tsumc _) (tunitc _)) (Var _ _ (Vz _ _))).
+  Lam (App (App (tsumc _) (tunitc _)) (Var (Vz _ _))).
 (* \a -> \b -> (sum a) b *)
 Definition teither : ty (F Ty (F Ty Ty)) :=
-  Lam _ _ _ (Lam _ _ _
-    (App _ _ _ (App _ _ _ (tsumc _)
-      (Var _ _ (Vs _ _ _ (Vz _ _)))) (Var _ _ (Vz _ _)))).
+  Lam (Lam
+    (App (App (tsumc _)
+      (Var (Vs _ (Vz _ _)))) (Var (Vz _ _)))).
 
 (* Shorthands for decoding closed types *)
-Definition deNat := decodeClosed Ty (Con _ _ Nat).
-Definition deUnit := decodeClosed Ty (Con _ _ Unit).
-Definition deMaybe (A : Set) := decodeClosed _ tmaybe A.
-Definition deEither (A B : Set) := decodeClosed _ teither A B.
+Definition deNat := decodeClosed (Con _ Nat).
+Definition deUnit := decodeClosed (Con _ Unit).
+Definition deMaybe (A : Set) := decodeClosed tmaybe A.
+Definition deEither (A B : Set) := decodeClosed teither A B.
 
 (* Compute examples *)
 Compute deNat. (* = nat *)
@@ -135,7 +139,7 @@ Compute deMaybe nat. (* = (unit + nat) *)
 Compute deEither. (* = fun A B : Set => (A + B) *)
 Compute deEither nat unit. (* = (nat + unit) *)
 
-Compute decodeClosed _ (Con _ _ Nat).
+Compute decodeClosed (Con _ Nat).
 
 (* Initial thougths for next phase: *)
 

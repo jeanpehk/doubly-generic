@@ -27,7 +27,7 @@ Definition vhd (A : Type) (n : nat) (v : vec A (S n)) : A :=
   | vcons a _ => a
   end.
 
-(* curry a vector *)
+(* quantify a vector *)
 Fixpoint quantify (A : Type) (n : nat)
   : (vec A n -> Set) -> Set :=
     match n return (vec A n -> Set) -> Set with
@@ -35,13 +35,46 @@ Fixpoint quantify (A : Type) (n : nat)
     | S n' => fun f => forall a : A,
                 quantify (fun As => f (vcons a As))
     end.
+ 
+(* curry for arity-genericiry *)
+Fixpoint curry (A : Type) (n : nat)
+  : forall (G : vec A n -> Set), (forall X : vec A n, G X) -> quantify G :=
+    match n return forall (G : vec A n -> Set),
+    (forall X : vec A n, G X) -> quantify G with
+    | O => fun _ f => f (vnil _)
+    | S n' => fun _ f => (fun (a:A) =>
+                curry _ (fun As => f (vcons a As)))
+    end.
+ 
+Set Asymmetric Patterns.
 
+(* ADMITTED *)
+Definition uncurry (n : nat) (A : Type) (G : vec A n -> Set)
+  : quantify G -> (forall (va : vec A n), G va).
+  Admitted.
+
+(*
+(* uncurry for arity-genericity *)
+Fixpoint uncurry (n : nat) (A : Set) (G : vec A n -> Set) (va : vec A n)
+  : forall (G : vec A n -> Set), quantify G -> (forall (va : vec A n), G va) :=
+  match n return forall (G : vec A n -> Set), quantify G ->
+    (forall (va : vec A n), G va) with
+  | O => fun G f va => match va in vec _ O return G va with
+    | vnil => f
+    end
+  | S n' => fun G f va => match va in vec _ (S n') return G va with
+    | vcons p a As  => uncurry _ (f a) As
+    end
+  end.
+  *)
+  
 (* uncurry a vector *)
 Fixpoint uncurryV (A B : Type) (n : nat) : nary_fn n A B -> vec A n -> B :=
 match n return nary_fn n A B -> vec A n -> B with
 | O => fun x _ => x
 | S n' => fun f t => uncurryV _ (f (vhd t)) (vtl t)
 end.
+Unset Asymmetric Patterns.
 
 (* apply a vector of functions to a vector *)
 Fixpoint zap (A B : Type) (n : nat) (vf : vec (A -> B) n)
@@ -97,10 +130,10 @@ Fixpoint zapT (A B : Type) (n : nat)
   end.
 
 (* uncurry a tuple *)
-Fixpoint uncurry (A B : Type) (n : nat) : nary_fn n A B -> tupleT A n -> B :=
+Fixpoint uncurryT (A B : Type) (n : nat) : nary_fn n A B -> tupleT A n -> B :=
 match n return nary_fn n A B -> tupleT A n -> B with
 | O => fun x _ => x
-| S n' => fun f t => let (x, y) := t in uncurry _ _ n' (f x) y
+| S n' => fun f t => let (x, y) := t in uncurryT _ _ n' (f x) y
 end.
 
 (* curry a tuple *)

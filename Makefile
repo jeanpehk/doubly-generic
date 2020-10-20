@@ -1,10 +1,12 @@
 .PHONY: all clean
 
+args = -impredicative-set
+
 all:
-	coqc -impredicative-set utils.v
+	coqc $(args) utils.v
 	coqc arity.v
-	coqc univ.v
-	coqc -impredicative-set generic.v
+	coqc $(args) univ.v
+	coqc $(args) generic.v
 
 clean:
 	rm *.vok *.glob *.vo *.vos
