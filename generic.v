@@ -29,13 +29,9 @@ Fixpoint kit (n : nat) (k : kind) (b : vec Set (S n) -> Set)
                                                kit k2 b (zap vs As))
     end.
 
-(* some map examples: *)
+(* type for map operation: [a,b] -> (a -> b) *)
 Definition Map : vec Set 2 -> Set :=
   fun vs => vhd vs -> vhd (vtl vs).
-
-Definition vect (A B : Set) := vcons A (vcons B (vnil _)).
-
-Compute kit Ty Map (vect nat unit). (* = nat -> unit *)
 
 (* type for mapping constants to a value *)
 Definition tyConstEnv (n : nat) (b : vec Set (S n) -> Set) : Set :=
@@ -66,16 +62,13 @@ Definition mapConst : tyConstEnv Map :=
     | Sum => doSum
     end.
 
-Definition owng (n : nat) (b : vec Set (S n) -> Set) (ce : tyConstEnv b)
-  (k : kind) (c : const k) :=
-  ce _ c .
+(* Example map with defs so far, works only for constants. *)
+Definition cmap (n : nat) {b : vec Set (S n) -> Set} (k : kind) (c : const k) :=
+  mapConst c.
 
-(* works only for constants. *)
-Definition cmap := owng mapConst.
-
-Compute cmap Prod _ _ (fun _ => true) _ _ (fun b => b + 1) (tt,2).
-Compute cmap Sum _ _ (fun _ => true)
-                 _ _ (fun n => if eqb n 1 then true else false) (inr 2).
+Compute cmap Prod _ bool (fun _ => true) nat nat (fun b => b + 1) (tt,2).
+Compute cmap Sum _ bool (fun _ => true)
+                 nat bool (fun n => if eqb n 1 then true else false) (inr 2).
 
 (* Now what is left is term specialization and then done for type-genericity *)
 
@@ -94,6 +87,7 @@ Section terms.
     fun t vs =>
       zap (repeat _ (decodeType t)) vs.
 
+  (* kit equality *)
   Definition eqkit : forall (n : nat) (k : kind) (b : vec Set (S n) -> Set)
     (t1 t2 : vec (decodeKind k) (S n)),
     t1 = t2 -> kit k b t1 -> kit k b t2.
@@ -112,6 +106,7 @@ Section terms.
 
   (* PROOFS to help with term specialization, definitions from W + C *)
 
+  (* helper *)
   Lemma eqtail : forall {A} (n : nat) (t1 t2 : vec A n) (x : A),
     t1 = t2 -> vcons x t1 = vcons x t2.
   Proof.
