@@ -92,8 +92,8 @@ Section terms.
     (t1 t2 : vec (decodeKind k) (S n)),
     t1 = t2 -> kit k b t1 -> kit k b t2.
   Proof.
-    intros. rewrite <- H; assumption.
-  Qed.
+    intros. induction H; assumption.
+  Defined.
 
   (* bunch of ngenvs to a vector of envs *)
   (* use '@' to provide implicits explicitly *)
@@ -111,7 +111,7 @@ Section terms.
     t1 = t2 -> vcons x t1 = vcons x t2.
   Proof.
     intros A n t1 t2 x eq. rewrite eq. reflexivity.
-  Qed.
+  Defined.
 
   Lemma c6 : forall (n : nat) (A B : Type) (f : A -> B) (x : A),
     zap (repeat n f) (repeat n x) = repeat n (f x).
@@ -119,7 +119,7 @@ Section terms.
     intros n A B f x. induction n.
     - simpl. reflexivity.
     - simpl. rewrite IHn. reflexivity.
-  Qed.
+  Defined.
 
   Lemma c5 : forall (n : nat) (k : kind) (G : ctx) (c : const k)
     (envs : vec (env G) n),
@@ -132,7 +132,7 @@ Section terms.
     - simpl. rewrite IHenvs. destruct G.
       + simpl. reflexivity.
       + simpl. reflexivity.
-  Qed.
+  Defined.
 
   Lemma c4 : forall (n : nat) (k1 k2 : kind) (G : ctx)
     (t1 : typ G (F k1 k2))
@@ -148,7 +148,7 @@ Section terms.
     -  destruct a.
       + simpl. apply eqtail. unfold interp' in IHenvs. apply IHenvs.
       + simpl. apply eqtail. unfold interp' in IHenvs. apply IHenvs.
-  Qed.
+  Defined.
 
   Lemma c3 : forall (n : nat) (k k' : kind) (G : ctx)
     (t : typ (cons k' G) k) (envs : vec (env G) n) (As : vec (decodeKind k') n),
@@ -170,7 +170,7 @@ Section terms.
       + destruct G.
         * apply eqtail. apply IHenvs.
         * apply eqtail. apply IHenvs.
-  Qed.
+  Defined.
 
   Lemma c2 : forall (n : nat) (k k' : kind) (G : ctx)
     (x : tyvar G k') (t1 : vec (decodeKind k) n) (envs : vec (env G) n),
@@ -184,7 +184,7 @@ Section terms.
     - simpl. destruct G.
       + apply eqtail. apply IHenvs.
       + apply eqtail. apply IHenvs.
-  Qed.
+  Defined.
 
   Lemma c1 : forall (n : nat) (k : kind) (G : ctx)
     (a : vec (decodeKind k) n) (envs : vec (env G) n),
@@ -193,7 +193,7 @@ Section terms.
     intros. induction a.
     - simpl. reflexivity.
     - apply eqtail. apply IHa.
-  Qed.
+  Defined.
 
   (* ADMITTED FOR TESTING OTHER DEFS *)
   Fixpoint nlookup (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
