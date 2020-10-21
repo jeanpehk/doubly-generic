@@ -54,20 +54,23 @@ Definition uncurry (n : nat) (A : Type) (G : vec A n -> Set)
   Admitted.
 
 (*
+
 (* uncurry for arity-genericity *)
-Fixpoint uncurry (n : nat) (A : Set) (G : vec A n -> Set) (va : vec A n)
-  : forall (G : vec A n -> Set), quantify G -> (forall (va : vec A n), G va) :=
+Fixpoint uncurry' (n : nat) (A : Set)
+  : forall (G : vec A n -> Set), quantify G -> forall (va : vec A n), G va :=
   match n return forall (G : vec A n -> Set), quantify G ->
-    (forall (va : vec A n), G va) with
+    forall (va : vec A n), G va with
   | O => fun G f va => match va in vec _ O return G va with
     | vnil => f
     end
-  | S n' => fun G f va => match va in vec _ (S n') return G va with
-    | vcons p a As  => uncurry _ (f a) As
+    (* err : veca has type 'vec A x' while expected 'vec A (S n')' *)
+  | S n' => fun G f veca => match veca in vec _ x return G veca with
+    | vcons p a As  => uncurry' _ (f a) As
     end
   end.
-  *)
   
+  *)
+
 (* uncurry a vector *)
 Fixpoint uncurryV (A B : Type) (n : nat) : nary_fn n A B -> vec A n -> B :=
 match n return nary_fn n A B -> vec A n -> B with
