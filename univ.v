@@ -3,6 +3,9 @@ From Coq Require Import List.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+(* Set Universe Polymorphism.
+Set Universe Minimization ToSet. *)
+
 (* Universe definition. *)
 
 Inductive kind : Set :=

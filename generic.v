@@ -198,7 +198,8 @@ Section terms.
   (* ADMITTED FOR TESTING OTHER DEFS *)
   Fixpoint nlookup (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
     : forall (v : tyvar G k) (nge : ngenv b G),
-  kit k b (interp' (Var v) (transpose nge)). Admitted.
+  kit k b (interp' (Var v) (transpose nge)).
+  Proof. Admitted.
 
   (*
   Fixpoint nlookup' (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
@@ -227,7 +228,7 @@ Section terms.
                   (ngen' t1 (ncons _ a nwt ve) ce))
     | @App _ k1 k2 t1 t2 => fun ve ce =>
         eqkit _ _ (c4 t1 t2 (transpose ve))
-        (@uncurry (S n) (decodeKind k1) (fun a => (forall _: kit k1 b a,
+        (@uncurry' (S n) (decodeKind k1) (fun a => (forall _: kit k1 b a,
                        (kit k2 b (zap (interp' t1 (transpose ve)) a))))
         (@ngen' _ _ _ (F k1 k2) t1 ve ce)
         (interp' t2 (transpose ve)) (ngen' t2 ve ce)

@@ -49,9 +49,22 @@ Fixpoint curry (A : Type) (n : nat)
 Set Asymmetric Patterns.
 
 (* ADMITTED *)
-Definition uncurry (n : nat) (A : Type) (G : vec A n -> Set)
-  : quantify G -> (forall (va : vec A n), G va).
-  Admitted.
+From Coq Require Import Program.
+
+Lemma vec_nil_case {A : Type} (v : vec A 0) : v = vnil A.
+Proof. Admitted.
+
+Lemma vec_cons_case {A : Type} {n : nat} (v : vec A (S n)) :
+  {x : A & {u : vec A n | v = vcons x u}}.
+Proof. Admitted.
+
+Fixpoint uncurry' (n : nat) (A : Type) {struct n}
+  : forall (G : vec A n -> Set), quantify G -> forall (va : vec A n), G va.
+Proof.
+  intros G f va. induction n as [| n' IH].
+  - hnf in f. pose proof vec_nil_case va as H. rewrite H. exact f.
+  - hnf in f. pose proof vec_cons_case va as H. destruct H as [a [As H]].
+    rewrite H. exact (uncurry' _ _ _ (f a) As). Defined.
 
 (*
 
