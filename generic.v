@@ -29,46 +29,43 @@ Fixpoint kit (n : nat) (k : kind) (b : vec Set (S n) -> Set)
                                                kit k2 b (zap vs As))
     end.
 
-(* type for map operation: [a,b] -> (a -> b) *)
-Definition Map : vec Set 2 -> Set :=
-  fun vs => vhd vs -> vhd (vtl vs).
-
 (* type for mapping constants to a value *)
 Definition tyConstEnv (n : nat) (b : vec Set (S n) -> Set) : Set :=
   forall (k:kind) (c:const k), kit k b (repeat _ (decodeClosed (Con _ c))).
 
-(* helper for mapConst *)
-Definition doSum (A1 B1 : Set)
-  : (A1 -> B1) -> forall (A2 B2 : Set), (A2 -> B2) -> (A1 + A2) -> (B1 + B2) :=
-  fun f =>
-    fun _ _ g sa =>
-      match sa with
-      | inl a => inl (f a)
-      | inr b => inr (g b)
+Section cmap.
+  (* An example of defining constants for map *)
+
+  (* type for the operation aka: [a,b] to (a -> b) *)
+  Definition Map : vec Set 2 -> Set :=
+    fun vs => vhd vs -> vhd (vtl vs).
+
+  (* helper for mapConst *)
+  Definition doSum (A1 B1 : Set)
+    : (A1 -> B1) -> forall (A2 B2 : Set), (A2 -> B2) -> (A1 + A2) -> (B1 + B2) :=
+    fun f =>
+      fun _ _ g sa =>
+        match sa with
+        | inl a => inl (f a)
+        | inr b => inr (g b)
+        end.
+
+  (* helper for mapConst *)
+  Definition doProd (A1 B1 : Set)
+    : (A1 -> B1) -> forall (A2 B2 : Set), (A2 -> B2) -> (A1 * A2) -> (B1 * B2) :=
+    fun f _ _ g sa => (f (fst sa), g (snd sa)).
+
+  (* Example of building a function for mapping constants to a value. *)
+  Definition mapConst : tyConstEnv Map :=
+    fun k c =>
+      match c in const k
+      return kit _ Map (repeat _ (decodeClosed (Con _ c))) with
+      | Nat => fun n => n
+      | Unit => fun _ => tt
+      | Prod => doProd
+      | Sum => doSum
       end.
-
-(* helper for mapConst *)
-Definition doProd (A1 B1 : Set)
-  : (A1 -> B1) -> forall (A2 B2 : Set), (A2 -> B2) -> (A1 * A2) -> (B1 * B2) :=
-  fun f _ _ g sa => (f (fst sa), g (snd sa)).
-
-(* Example of building a function for mapping constants to a value. *)
-Definition mapConst : tyConstEnv Map :=
-  fun k c =>
-    match c in const k return kit _ Map (repeat _ (decodeClosed (Con _ c))) with
-    | Nat => fun n => n
-    | Unit => fun _ => tt
-    | Prod => doProd
-    | Sum => doSum
-    end.
-
-(* Example map with defs so far, works only for constants. *)
-Definition cmap (n : nat) {b : vec Set (S n) -> Set} (k : kind) (c : const k) :=
-  mapConst c.
-
-Compute cmap Prod _ bool (fun _ => true) nat nat (fun b => b + 1) (tt,2).
-Compute cmap Sum _ bool (fun _ => true)
-                 nat bool (fun n => if eqb n 1 then true else false) (inr 2).
+End cmap.
 
 (* Now what is left is term specialization and then done for type-genericity *)
 
@@ -97,7 +94,8 @@ Section terms.
 
   (* bunch of ngenvs to a vector of envs *)
   (* use '@' to provide implicits explicitly *)
-  Fixpoint transpose (n : nat) (b : vec Set (S n) -> Set) (G : ctx) (nge : ngenv b G)
+  Fixpoint transpose (n : nat) (b : vec Set (S n) -> Set)
+    (G : ctx) (nge : ngenv b G)
     : vec (env G) (S n) :=
       match nge with
       | nnil _ => repeat _ enil
@@ -162,7 +160,8 @@ Section terms.
         * simpl. reflexivity.
       + destruct G.
         * apply eqtail. simpl in IHv. apply IHv with (envs := v). reflexivity.
-        * apply eqtail. simpl. simpl in IHv. apply IHv with (envs := v). reflexivity.
+        * apply eqtail. simpl. simpl in IHv. apply IHv with (envs := v).
+          reflexivity.
     - induction envs.
       + simpl. destruct G.
         * simpl. reflexivity.
@@ -216,8 +215,10 @@ Section terms.
     *)
 
   (* term specialization with non-empty context *)
-  Fixpoint ngen' (n : nat) (b : vec Set (S n) -> Set) (G : ctx) (k : kind) (t : typ G k)
-    : forall (ve : ngenv b G) (ce : tyConstEnv b), kit k b (interp' t (transpose ve)) :=
+  Fixpoint ngen' (n : nat) (b : vec Set (S n) -> Set)
+    (G : ctx) (k : kind) (t : typ G k)
+    : forall (ve : ngenv b G) (ce : tyConstEnv b),
+    kit k b (interp' t (transpose ve)) :=
     match t in typ G k
     return forall (ve : ngenv b G) (ce : tyConstEnv b),
     kit k b (interp' t (transpose ve)) with
@@ -243,8 +244,9 @@ Section terms.
 
 End terms.
 
-(* generic map *)
-Definition gmap (k : kind) (t : ty k) : kit k Map (repeat 2 (decodeClosed t)) :=
+(* Now we can use ngen and mapConst to define a generic map *)
+
+Definition gmap (k : kind) (t : ty k) : kit k Map _ :=
   ngen t mapConst.
 
 (* examples  of using gmap, still need to fix defs for 'nlookup' and 'uncurry' *)
@@ -253,3 +255,75 @@ Compute gmap tprod _ _ (fun a => a + 1) _ _ (fun b => negb b) (1,true).
 Compute gmap tmaybe _ bool (fun _ => false) (inl tt). (* ~ Nothing *)
 Compute gmap tmaybe _ _ (fun _ => false) (inr 3). (* ~ Just 3 *)
 
+(***********************************************************************)
+(* with these datatype-genericity done, now just need to add arity-gen *)
+(***********************************************************************)
+
+(* turn a vector of types into a function type, e.g [a,b,c] into: a -> b -> c *)
+Fixpoint funTy {n : nat} (v : vec Set (S n)) : Set :=
+  match v with
+  | @vcons _ O x xs => x
+  | @vcons _ (S n') x xs => x -> funTy xs
+  end.
+
+Section argm.
+  (* example of the functionality that the user needs to provide *)
+  (* aka how doubly-generic map works for constants *)
+
+  Definition pr : decodeKind (F Ty (F Ty Ty)) := prod.
+  Definition sm : decodeKind (F Ty (F Ty Ty)) := sum.
+
+  (* nat constant for nmapconst *)
+  Fixpoint cNat (n : nat) : kit Ty funTy (repeat (S n) nat) :=
+    let f := (fix cNat' (n' : nat)
+      : kit Ty funTy (repeat (S n') nat) :=
+      match n' return kit Ty funTy (repeat (S n') nat) with
+      | O => O
+      | S O => fun x => x
+      | S (S m) => fun x y => cNat' m
+    end) in
+    match n return kit Ty funTy (repeat (S n) nat) with
+    | O => O
+    | S O => fun x => x
+    | (S (S m)) =>
+        if odd m
+        then fun x y => cNat m
+        else fun x => f (S m)
+    end.
+
+  (* unit constant for nmapconst *)
+  Fixpoint cUnit (n : nat) : kit Ty funTy (repeat (S n) unit) :=
+    match n with
+    | O => tt
+    | S n' => fun x => cUnit n'
+    end.
+
+  Definition cSum (n : nat) : kit (F Ty (F Ty Ty)) funTy (repeat (S n) sm).
+  Admitted.
+
+  Definition cProd (n : nat) : kit (F Ty (F Ty Ty)) funTy (repeat (S n) pr).
+  Admitted.
+
+  Definition nmapConst {n : nat} : tyConstEnv (@funTy n) :=
+    fun k c =>
+      match c in const k with
+      (*in const k return kit _ Map (repeat _ (decodeClosed (Con _ c))) with *)
+      | Nat => cNat _
+      | Unit => cUnit _
+      | Prod => cProd _
+      | Sum => cSum _
+      end.
+
+End argm.
+
+(* Now can define a doubly-generic map with ngen and nmapConst *)
+
+Definition ngmap (n : nat) (k : kind) (t : ty k)
+  : kit k funTy (repeat (S n) (decodeClosed t)) :=
+  ngen t nmapConst.
+
+(* some test examples *)
+Compute ngmap 0 tunit. (* = tt *)
+Compute ngmap 1 tunit tt. (* = tt *)
+Compute ngmap 2 tnat 1 2. (* = 2 *)
+Compute ngmap 3 tnat 1 2 3. (* = 3 *)

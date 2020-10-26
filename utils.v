@@ -1,3 +1,5 @@
+From Coq Require Import Program List.
+
 Set Implicit Arguments.
 
 (* Utilities *)
@@ -36,7 +38,7 @@ Fixpoint quantify (A : Type) (n : nat)
                 quantify (fun As => f (vcons a As))
     end.
  
-(* curry for arity-genericiry *)
+(* curry for arity-genericity *)
 Fixpoint curry (A : Type) (n : nat)
   : forall (G : vec A n -> Set), (forall X : vec A n, G X) -> quantify G :=
     match n return forall (G : vec A n -> Set),
@@ -45,52 +47,38 @@ Fixpoint curry (A : Type) (n : nat)
     | S n' => fun _ f => (fun (a:A) =>
                 curry _ (fun As => f (vcons a As)))
     end.
- 
-Set Asymmetric Patterns.
 
-(* ADMITTED *)
-From Coq Require Import Program.
+Definition vec_nil_case {A : Type} (v : vec A 0) : v = vnil A :=
+  match v with (vnil _) => eq_refl end.
 
-Lemma vec_nil_case {A : Type} (v : vec A 0) : v = vnil A.
-Proof. Admitted.
+Lemma veq_hdtl {A : Type} {n : nat} (v : vec A (S n)) :
+  v = vcons (vhd v) (vtl v).
+Proof.
+Admitted.
 
 Lemma vec_cons_case {A : Type} {n : nat} (v : vec A (S n)) :
   {x : A & {u : vec A n | v = vcons x u}}.
-Proof. Admitted.
+Proof.
+  apply existT with (x:=vhd v).
+  apply exist with (x:=vtl v).
+  apply veq_hdtl.
+Defined.
 
 Fixpoint uncurry' (n : nat) (A : Type) {struct n}
   : forall (G : vec A n -> Set), quantify G -> forall (va : vec A n), G va.
 Proof.
   intros G f va. induction n as [| n' IH].
   - hnf in f. pose proof vec_nil_case va as H. rewrite H. exact f.
-  - hnf in f. pose proof vec_cons_case va as H. destruct H as [a [As H]].
+  - hnf in f.
+    pose proof vec_cons_case va as H. destruct H as [a [As H]].
     rewrite H. exact (uncurry' _ _ _ (f a) As). Defined.
-
-(*
-
-(* uncurry for arity-genericity *)
-Fixpoint uncurry' (n : nat) (A : Set)
-  : forall (G : vec A n -> Set), quantify G -> forall (va : vec A n), G va :=
-  match n return forall (G : vec A n -> Set), quantify G ->
-    forall (va : vec A n), G va with
-  | O => fun G f va => match va in vec _ O return G va with
-    | vnil => f
-    end
-    (* err : veca has type 'vec A x' while expected 'vec A (S n')' *)
-  | S n' => fun G f veca => match veca in vec _ x return G veca with
-    | vcons p a As  => uncurry' _ (f a) As
-    end
-  end.
-  
-  *)
 
 (* uncurry a vector *)
 Fixpoint uncurryV (A B : Type) (n : nat) : nary_fn n A B -> vec A n -> B :=
-match n return nary_fn n A B -> vec A n -> B with
-| O => fun x _ => x
-| S n' => fun f t => uncurryV _ (f (vhd t)) (vtl t)
-end.
-Unset Asymmetric Patterns.
+  match n return nary_fn n A B -> vec A n -> B with
+  | O => fun x _ => x
+  | S n' => fun f t => uncurryV _ (f (vhd t)) (vtl t)
+  end.
 
 (* apply a vector of functions to a vector *)
 Fixpoint zap (A B : Type) (n : nat) (vf : vec (A -> B) n)
