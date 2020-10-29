@@ -1,4 +1,5 @@
 From Coq Require Import Program List.
+Set Universe Polymorphism.
 
 Set Implicit Arguments.
 
