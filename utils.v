@@ -18,6 +18,22 @@ Inductive vec (A : Type) : nat -> Type :=
   | vnil : vec A O
   | vcons : forall n, A -> vec A n -> vec A (S n).
 
+(* induction schemes for vectors, taken from coq stdlib *)
+
+Definition rectS {A} (P : forall {n}, vec A (S n) -> Type)
+  (bas : forall a : A, P (vcons a (vnil _)))
+  (rect: forall a {n} (v : vec A (S n)), P v -> P (vcons a v)) :=
+  fix rectS_fix {n} (v : vec A (S n)) : P v :=
+  match v with
+  |@vcons _ 0 a v =>
+      match v with
+      | vnil _ => bas a
+      | _ => fun devil => False_ind (@IDProp) devil
+      end
+  |@vcons _ (S nn') a v => rect a v (rectS_fix v)
+  |_ => fun devil => False_ind (@IDProp) devil
+  end.
+
 (* tail *)
 Definition vtl (A : Type) (n : nat) (v : vec A (S n)) : vec A n :=
   match v with
@@ -55,7 +71,10 @@ Definition vec_nil_case {A : Type} (v : vec A 0) : v = vnil A :=
 Lemma veq_hdtl {A : Type} {n : nat} (v : vec A (S n)) :
   v = vcons (vhd v) (vtl v).
 Proof.
-Admitted.
+  apply rectS with (v := v).
+  - intros. simpl. reflexivity.
+  - intros. simpl. reflexivity.
+Defined.
 
 Lemma vec_cons_case {A : Type} {n : nat} (v : vec A (S n)) :
   {x : A & {u : vec A n | v = vcons x u}}.
