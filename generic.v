@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 Set Universe Polymorphism.
 
-From Coq Require Import Program Nat.
+From Coq Require Import Program.
 
 Require Import univ utils.
 
@@ -75,9 +75,9 @@ Section terms.
  (* section for term specialization *)
 
   (* env of kind-indexed types *)
-  Inductive ngenv (n : nat) : (vec Set (S n) -> Set) -> ctx -> Type :=
-    | nnil : forall b, ngenv b nil
-    | ncons : forall b (k:kind) (G : ctx) (a : vec (decodeKind k) (S n)),
+  Inductive ngenv (n : nat) (b : vec Set (S n) -> Set) : ctx -> Type :=
+    | nnil : ngenv b nil
+    | ncons : forall {k} {G} (a : vec (decodeKind k) (S n)),
         kit k b a -> ngenv b G -> ngenv b (cons k G).
 
   (* interpret a generic type + vector of envs to a vec of types *)
@@ -101,7 +101,7 @@ Section terms.
     : vec (env G) (S n) :=
       match nge with
       | nnil _ => repeat _ enil
-      | ncons _ a _ nge => zap (zap (repeat _ (@econs _ _)) a) (transpose nge)
+      | ncons a _ nge => zap (zap (repeat _ (@econs _ _)) a) (transpose nge)
       end.
 
   (* PROOFS to help with term specialization, definitions from W + C *)
@@ -196,45 +196,43 @@ Section terms.
     - apply eqtail. apply IHa.
   Defined.
 
-  Lemma inter : forall (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
-    (a : vec (decodeKind k) (S n))
-    (H : vec (env (k :: G)) (S n)) (nge : ngenv b (k :: G)%list),
-    interp' (Var (Vz G k)) (transpose nge) =
-    interp' (Var (Vz (k :: G) k))
-    (zap (zap (repeat (S n) (econs k (G:=k :: G))) a) H).
-  Proof.
-  intros. induction n. Admitted.
-
-  (* ADMITTED FOR TESTING OTHER DEFS *)
+  (* Lookup a type for var from nge  *)
   Fixpoint nlookup (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
-    : forall (v : tyvar G k) (nge : ngenv b G),
-  kit k b (interp' (Var v) (transpose nge)).
+    (v : tyvar G k) (nge : ngenv b G) :
+    kit k b (interp' (Var v) (transpose nge)).
   Proof.
     intros.
-    induction v as [| cx k1 k2 vs IHv].
-    - inversion nge. subst. apply eqkit with (t1 := a).
-      + pose proof transpose nge as H.
-        pose proof (c1 k a H) as HH.
-        rewrite inter with (a := a) (H := H). rewrite <- HH. reflexivity.
-      + apply H1.
-    - inversion nge. subst. pose proof IHv X as LV.
-      pose proof (transpose nge) as tn.
-  pose proof (c2 _ vs a) as C. admit.
-  Admitted.
 
-  (*
-  Fixpoint nlookup' (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
-    : forall (tv : tyvar G k) (nge : ngenv b G),
-    kit k b (interp' (Var tv) (transpose nge)) :=
-    fun tv nge =>
-      match tv in tyvar G k, nge in ngenv b G
-      return kit k b (interp' (Var tv) (transpose nge)) with
-      | Vz _ _, ncons _ x e ne =>
-          eqkit _ _ (c1 _ x (transpose ne))
-      | Vs g v, ncons _ x e ne =>
-          _
-    end.
-    *)
+    destruct nge.
+    - inversion v.
+    - dependent destruction v.
+      + apply eqkit with (t1 := a).
+        * pose proof (c1 _ a (transpose nge)) as ch. simpl in ch. simpl.
+          rewrite <- ch. reflexivity.
+        * apply k1.
+      + pose proof (c2 _ v a (transpose nge)) as ch.
+        apply eqkit with (b:=b) in ch.
+        * apply ch.
+        * exact (nlookup _ _ _ _ v nge).
+
+          (** stuck without dependent destruction:
+
+    destruct nge.
+    - inversion v.
+    - inversion v; subst.
+      + apply eqkit with (t1 := a).
+        * pose proof (c1 _ a (transpose nge)) as ch. simpl in ch. simpl.
+          (* needs Var (Vz G k) = Var v *)
+          admit.
+        * apply k1.
+      + pose proof (c2 _ X a (transpose nge)) as ch.
+        apply eqkit with (b:=b) in ch.
+        * (* needs Var (Vs k0 X) = Var v *)
+          admit.
+        * exact (nlookup _ _ _ _ X nge).
+
+          **)
+  Defined.
 
   (* term specialization with non-empty context *)
   Fixpoint ngen' (n : nat) (b : vec Set (S n) -> Set)
@@ -248,7 +246,7 @@ Section terms.
     | @Lam _ k1 k2 t1 => fun ve ce =>
         curry _ (fun (a : vec (decodeKind k1) (S n)) (nwt : kit k1 b a) =>
                   eqkit _ _ (c3 t1 (transpose ve) a)
-                  (ngen' t1 (ncons _ a nwt ve) ce))
+                  (ngen' t1 (ncons a nwt ve) ce))
     | @App _ k1 k2 t1 t2 => fun ve ce =>
         eqkit _ _ (c4 t1 t2 (transpose ve))
         (@uncurry' (S n) (decodeKind k1) (fun a => (forall _: kit k1 b a,
@@ -262,7 +260,7 @@ Section terms.
   (* term specialization in an empty context. *)
   Definition ngen (n : nat) (b : vec Set (S n) -> Set) (k : kind) (t : ty k)
   (ce : tyConstEnv b) : kit k b (repeat (S n) (decodeClosed t)) :=
-  @eqkit n k b _ _ (c6 _ _ _ ) (ngen' t (nnil _) ce).
+  eqkit k b (c6 _ _ _ ) (ngen' t (nnil _) ce).
 
 End terms.
 
@@ -271,11 +269,12 @@ End terms.
 Definition gmap (k : kind) (t : ty k) : kit k Map _ :=
   ngen t mapConst.
 
-(* examples  of using gmap, still need to fix defs for 'nlookup' and 'uncurry' *)
+(* examples  of using gmap *)
 Compute gmap tprod _ _ (fun a => a + 1) _ _ (fun b => negb b) (1,true).
 (* tmaybe is a self defined type, definition in 'univ.v' *)
 Compute gmap tmaybe _ bool (fun _ => false) (inl tt). (* ~ Nothing *)
-Compute gmap tmaybe _ _ (fun _ => false) (inr 3). (* ~ Just 3 *)
+Compute gmap tmaybe _ _ (fun n => false) (inr 3). (* ~ Just 3 *)
+Compute gmap teither _ _ (fun _ => false) _ _ (fun _ => true) (inl tt).
 
 (***********************************************************************)
 (* with these datatype-genericity done, now just need to add arity-gen *)
@@ -296,7 +295,6 @@ Section argm.
   (* example of the functionality that the user needs to provide *)
   (* aka how doubly-generic map works for constants *)
 
-
   (* nat constant for nmapconst *)
   Fixpoint cNat (n : nat) : kit Ty funTy (repeat (S n) nat) :=
     let f := (fix cNat' (n' : nat)
@@ -310,7 +308,7 @@ Section argm.
     | O => O
     | S O => fun x => x
     | (S (S m)) =>
-        if odd m
+        if Nat.odd m
         then fun x y => cNat m
         else fun x => f (S m)
     end.
@@ -393,9 +391,9 @@ Section eq.
     let f := (fix eqNat' (n' : nat) : kit Ty geq (repeat (S n') nat) :=
       match n' return kit Ty geq (repeat (S n') nat) with
       | O => fun _ => true
-      | S O => fun a b => eqb a b
+      | S O => fun a b => Nat.eqb a b
       | S (S m) =>
-          fun a b => if eqb a b then (eqNat m) else geqFalse (repeat _ nat)
+          fun a b => if Nat.eqb a b then (eqNat m) else geqFalse (repeat _ nat)
           (*
       | S (S m) => fun a b =>
           if eqb a b then eqNat m else geqFalse (repeat _ nat)
@@ -403,8 +401,8 @@ Section eq.
     end) in
       match n return kit Ty geq (repeat (S n) nat) with
       | O => fun _ => true
-      | S O => fun a b => eqb a b
-      | S n => fun a b => if eqb a b then (f n) a else geqFalse (repeat _ nat)
+      | S O => fun a b => Nat.eqb a b
+      | S n => fun a b => if Nat.eqb a b then (f n) a else geqFalse (repeat _ nat)
           (*
       | O => fun _ => true
       | S O => fun a b => eqb a b

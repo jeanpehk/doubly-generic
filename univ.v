@@ -1,4 +1,4 @@
-From Coq Require Import List.
+From Coq Require Import List Program.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -48,7 +48,7 @@ Definition ctx : Type := list kind.
 (* Variables *)
 Inductive tyvar : ctx -> kind -> Type :=
   | Vz : forall G k, tyvar (k :: G) k
-  | Vs : forall G k' k, tyvar G k -> tyvar (k' :: G) k.
+  | Vs : forall G k k', tyvar G k -> tyvar (k' :: G) k.
 
 (* Datatype for representing types of arbitrary kinds.    *)
 (* Indexed by the typing context and the kind of the type. *)
@@ -57,6 +57,7 @@ Inductive typ : ctx -> kind -> Type :=
   | Lam : forall G k1 k2, typ (k1 :: G) k2 -> typ G (F k1 k2)
   | App : forall G k1 k2, typ G (F k1 k2) -> typ G k1 -> typ G k2
   | Con : forall G k, const k -> typ G k.
+
 
 (* Type in an empty context *)
 Definition ty : kind -> Type :=
