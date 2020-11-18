@@ -86,6 +86,24 @@ Section terms.
     fun t vs =>
       zap (repeat _ (decodeType t)) vs.
 
+  Lemma zr : forall n G k (t1 : tyvar G k) (a : env G) (v : vec (env G) n),
+    zap (repeat (S n) (decodeType (Var t1))) (vcons a v)
+    = vcons (decodeType (Var t1) a)
+    (zap (repeat n (decodeType (Var t1))) v).
+  Proof.
+    intros. reflexivity.
+  Defined.
+
+  Lemma ineqv : forall n G k (t1 t2 : tyvar G k) (v : vec (env G) n),
+    interp' (Var t1) v = interp' (Var t2) v.
+  Proof.
+    intros.
+    intros. induction v.
+    - destruct t1; reflexivity.
+    - unfold interp'. unfold interp' in IHv. rewrite zr. rewrite zr.
+      rewrite IHv. simpl.
+  Admitted.
+
   (* kit equality *)
   Definition eqkit : forall (n : nat) (k : kind) (b : vec Set (S n) -> Set)
     (t1 t2 : vec (decodeKind k) (S n)),
@@ -96,8 +114,8 @@ Section terms.
 
   (* turn an ngenv to a vector of envs *)
   (* use '@' to provide implicits explicitly *)
-  Fixpoint transpose (n : nat) (b : vec Set (S n) -> Set)
-    (G : ctx) (nge : ngenv b G)
+  Fixpoint transpose {n : nat} {b : vec Set (S n) -> Set}
+    {G : ctx} (nge : ngenv b G)
     : vec (env G) (S n) :=
       match nge with
       | nnil _ => repeat _ enil
@@ -203,6 +221,9 @@ Section terms.
   Proof.
     intros.
 
+    (*
+    PROOF WITH DEPENDENT DESTRUCTION:
+
     destruct nge.
     - inversion v.
     - dependent destruction v.
@@ -214,8 +235,9 @@ Section terms.
         apply eqkit with (b:=b) in ch.
         * apply ch.
         * exact (nlookup _ _ _ _ v nge).
+        *)
 
-          (** stuck without dependent destruction:
+    (** stuck without dependent destruction: **)
 
     destruct nge.
     - inversion v.
@@ -230,9 +252,28 @@ Section terms.
         * (* needs Var (Vs k0 X) = Var v *)
           admit.
         * exact (nlookup _ _ _ _ X nge).
+  Admitted.
 
-          **)
-  Defined.
+  (*
+  Fixpoint nlookup' (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
+    : forall (v : tyvar G k) (nge : ngenv b G),
+    kit k b (interp' (Var v) (transpose nge)) :=
+    fun (v0 : tyvar G k) =>
+    match v0 as v' in tyvar G0 k0
+    return forall (nge0 : ngenv _ G0),
+    kit _ _ (interp' (Var v') (transpose nge0)) with
+      | Vz G1 k1 => fun (nge0 : ngenv _ _) =>
+          match nge0 as nge' in ngenv _ (k1 :: G1)%list
+          return kit _ _ (interp' (Var (Vz G1 k1)) (transpose nge')) with
+          | ncons x e ne => eqkit _ _ (c1 _ x (transpose ne)) e
+          end
+      | @Vs G2 k2 k3 v2 => fun (nge0 : ngenv _ _) =>
+          match nge0 as nge0' in ngenv _ (k3 :: G2)%list
+          return kit _ _ (interp' (Var (Vs k3 v2)) (transpose nge0')) with
+          | ncons x e ne => eqkit _ _ (c2 _ v2 x (transpose ne)) (nlookup' v2 ne)
+          end
+    end.
+        *)
 
   (* term specialization with non-empty context *)
   Fixpoint ngen' (n : nat) (b : vec Set (S n) -> Set)
