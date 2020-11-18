@@ -214,45 +214,32 @@ Section terms.
     - apply eqtail. apply IHa.
   Defined.
 
+  Import EqNotations.
+
+  (* https://jamesrwilcox.com/dep-destruct.html *)
+  Lemma inv (k k' : kind) (G : ctx) (v : tyvar (k' :: G)%list k) :
+    {p : k' = k | rew [fun k' : kind => tyvar (k' :: G)%list k] p in v = Vz G k} +
+    {w : tyvar G k | v = Vs k' w}.
+  Proof. Admitted.
+
   (* Lookup a type for var from nge  *)
   Fixpoint nlookup (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
     (v : tyvar G k) (nge : ngenv b G) :
     kit k b (interp' (Var v) (transpose nge)).
   Proof.
-    intros.
-
-    (*
-    PROOF WITH DEPENDENT DESTRUCTION:
-
     destruct nge.
     - inversion v.
-    - dependent destruction v.
-      + apply eqkit with (t1 := a).
+    - pose proof inv v as i. destruct i as [[p e] | [w e]].
+      + subst. apply eqkit with (t1 := a).
         * pose proof (c1 _ a (transpose nge)) as ch. simpl in ch. simpl.
+          cbn in e. rewrite e.
           rewrite <- ch. reflexivity.
         * apply k1.
-      + pose proof (c2 _ v a (transpose nge)) as ch.
+      + rewrite e.
+        pose proof (c2 _ w a (transpose nge)) as ch.
         apply eqkit with (b:=b) in ch.
         * apply ch.
-        * exact (nlookup _ _ _ _ v nge).
-        *)
-
-    (** stuck without dependent destruction: **)
-
-    destruct nge.
-    - inversion v.
-    - inversion v; subst.
-      + apply eqkit with (t1 := a).
-        * pose proof (c1 _ a (transpose nge)) as ch. simpl in ch. simpl.
-          (* needs Var (Vz G k) = Var v *)
-          admit.
-        * apply k1.
-      + pose proof (c2 _ X a (transpose nge)) as ch.
-        apply eqkit with (b:=b) in ch.
-        * (* needs Var (Vs k0 X) = Var v *)
-          admit.
-        * exact (nlookup _ _ _ _ X nge).
-  Admitted.
+        * exact (nlookup _ _ _ _ w nge). Defined.
 
   (*
   Fixpoint nlookup' (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
