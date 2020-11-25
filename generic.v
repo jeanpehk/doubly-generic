@@ -215,9 +215,10 @@ Section terms.
     - apply eqtail. apply IHa.
   Defined.
 
+(*
   Import EqNotations.
 
-  (* https://jamesrwilcox.com/dep-destruct.html *)
+   https://jamesrwilcox.com/dep-destruct.html 
   Lemma inv (k k' : kind) (G : ctx) (v : tyvar (k' :: G) k) :
     {p : k' = k | rew [fun k' : kind => tyvar (k' :: G) k] p in v = Vz G k} +
     {w : tyvar G k | v = Vs k' w}.
@@ -225,7 +226,7 @@ Section terms.
     pattern v. apply tvcase; intros.
     - left. apply exist with (x:=eq_sym pf). subst; auto.
     - right. apply exist with (x:=x). reflexivity.
-  Defined.
+  Defined.*)
 
   (* Lookup a type for var from nge  *)
   Fixpoint nlookup (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
@@ -234,6 +235,17 @@ Section terms.
   Proof.
     destruct nge.
     - inversion v.
+    - pattern v; apply tvcase; clear v; intros.
+      + subst. apply eqkit with (t1:=a).
+        * pose proof (c1 _ a (transpose nge)) as ch. simpl in ch; simpl.
+          rewrite <- ch; reflexivity.
+        * assumption.
+      + pose proof (c2 _ x a (transpose nge)) as ch.
+        apply eqkit with (b:=b) in ch.
+        * apply ch.
+       * exact (nlookup _ _ _ _ x nge). Defined.
+
+         (*
     - pose proof inv v as i. destruct i as [[p e] | [w e]].
       + subst. apply eqkit with (t1 := a).
         * pose proof (c1 _ a (transpose nge)) as ch. simpl in ch. simpl.
@@ -245,6 +257,7 @@ Section terms.
         apply eqkit with (b:=b) in ch.
         * apply ch.
        * exact (nlookup _ _ _ _ w nge). Defined.
+         *)
 
   (* term specialization with non-empty context *)
   Fixpoint ngen' (n : nat) (b : vec Set (S n) -> Set)
