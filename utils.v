@@ -18,8 +18,7 @@ Inductive vec (A : Type) : nat -> Type :=
   | vnil : vec A O
   | vcons : forall n, A -> vec A n -> vec A (S n).
 
-(* induction schemes for vectors, taken from coq stdlib *)
-
+(* induction scheme for vectors, taken from coq stdlib *)
 Definition rectS {A} (P : forall {n}, vec A (S n) -> Type)
   (bas : forall a : A, P (vcons a (vnil _)))
   (rect: forall a {n} (v : vec A (S n)), P v -> P (vcons a v)) :=

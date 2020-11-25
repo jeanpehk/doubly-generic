@@ -50,6 +50,32 @@ Inductive tyvar : ctx -> kind -> Type :=
   | Vz : forall G k, tyvar (k :: G) k
   | Vs : forall G k k', tyvar G k -> tyvar (k' :: G) k.
 
+Import EqNotations.
+
+Lemma tvcase :
+  forall G k k' (P : tyvar (k' :: G) k -> Type),
+  (*(forall (pf : k=k'), P (eq_vs (Vz G k) pf)) ->*)
+  (forall (pf : k=k'), P (rew [fun x:kind => tyvar (x :: G) k] pf in Vz G k)) ->
+  (forall x, P (Vs _ x)) ->
+  forall x, P x.
+  Proof.
+    intros.
+    refine
+    (match x as x' in tyvar (k0 :: G0) k1
+    return forall (pk' : k0 = k') (pk : k1 = k) (pg : G0 = G),
+    rew [fun x : kind => tyvar (x :: _) k] pk' in
+    rew [fun x' : kind => tyvar (_ :: _) x'] pk in
+    rew [fun g : ctx => tyvar (_ :: g) _] pg in
+    x' = x
+    -> P x
+    with
+    | Vz _ _ => _
+    | Vs _ _ _ _ => _
+    end eq_refl eq_refl eq_refl eq_refl).
+    - intros. subst. apply X.
+    - intros. subst. simpl. apply (X0 t).
+  Defined.
+
 (* Datatype for representing types of arbitrary kinds.    *)
 (* Indexed by the typing context and the kind of the type. *)
 Inductive typ : ctx -> kind -> Type :=
@@ -57,7 +83,6 @@ Inductive typ : ctx -> kind -> Type :=
   | Lam : forall G k1 k2, typ (k1 :: G) k2 -> typ G (F k1 k2)
   | App : forall G k1 k2, typ G (F k1 k2) -> typ G k1 -> typ G k2
   | Con : forall G k, const k -> typ G k.
-
 
 (* Type in an empty context *)
 Definition ty : kind -> Type :=
@@ -76,6 +101,14 @@ Definition envtl (k : kind) (G : ctx) (en : env (k :: G)) : env G :=
   match en with
   | econs _ _ _ G' => G'
   end.
+
+Theorem slookup' : forall (k : kind) (G : ctx) (tv : tyvar G k) (e : env G),
+  decodeKind k.
+Proof.
+  intros. induction tv.
+  - inversion e. apply X.
+  - inversion e. exact (IHtv X0).
+Defined.
 
 (* lookup a type from env *)
 Fixpoint slookup (k : kind) (G : ctx) (tv : tyvar G k) : env G -> decodeKind k :=

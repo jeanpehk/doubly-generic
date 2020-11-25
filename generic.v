@@ -1,7 +1,8 @@
 Set Implicit Arguments.
 Set Universe Polymorphism.
 
-From Coq Require Import Program.
+From Coq Require Import Program List.
+Import ListNotations.
 
 Require Import univ utils.
 
@@ -217,10 +218,14 @@ Section terms.
   Import EqNotations.
 
   (* https://jamesrwilcox.com/dep-destruct.html *)
-  Lemma inv (k k' : kind) (G : ctx) (v : tyvar (k' :: G)%list k) :
-    {p : k' = k | rew [fun k' : kind => tyvar (k' :: G)%list k] p in v = Vz G k} +
+  Lemma inv (k k' : kind) (G : ctx) (v : tyvar (k' :: G) k) :
+    {p : k' = k | rew [fun k' : kind => tyvar (k' :: G) k] p in v = Vz G k} +
     {w : tyvar G k | v = Vs k' w}.
-  Proof. Admitted.
+  Proof.
+    pattern v. apply tvcase; intros.
+    - left. apply exist with (x:=eq_sym pf). subst; auto.
+    - right. apply exist with (x:=x). reflexivity.
+  Defined.
 
   (* Lookup a type for var from nge  *)
   Fixpoint nlookup (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
@@ -239,28 +244,7 @@ Section terms.
         pose proof (c2 _ w a (transpose nge)) as ch.
         apply eqkit with (b:=b) in ch.
         * apply ch.
-        * exact (nlookup _ _ _ _ w nge). Defined.
-
-  (*
-  Fixpoint nlookup' (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
-    : forall (v : tyvar G k) (nge : ngenv b G),
-    kit k b (interp' (Var v) (transpose nge)) :=
-    fun (v0 : tyvar G k) =>
-    match v0 as v' in tyvar G0 k0
-    return forall (nge0 : ngenv _ G0),
-    kit _ _ (interp' (Var v') (transpose nge0)) with
-      | Vz G1 k1 => fun (nge0 : ngenv _ _) =>
-          match nge0 as nge' in ngenv _ (k1 :: G1)%list
-          return kit _ _ (interp' (Var (Vz G1 k1)) (transpose nge')) with
-          | ncons x e ne => eqkit _ _ (c1 _ x (transpose ne)) e
-          end
-      | @Vs G2 k2 k3 v2 => fun (nge0 : ngenv _ _) =>
-          match nge0 as nge0' in ngenv _ (k3 :: G2)%list
-          return kit _ _ (interp' (Var (Vs k3 v2)) (transpose nge0')) with
-          | ncons x e ne => eqkit _ _ (c2 _ v2 x (transpose ne)) (nlookup' v2 ne)
-          end
-    end.
-        *)
+       * exact (nlookup _ _ _ _ w nge). Defined.
 
   (* term specialization with non-empty context *)
   Fixpoint ngen' (n : nat) (b : vec Set (S n) -> Set)
@@ -298,11 +282,13 @@ Definition gmap (k : kind) (t : ty k) : kit k Map _ :=
   ngen t mapConst.
 
 (* examples  of using gmap *)
-Compute gmap tprod _ _ (fun a => a + 1) _ _ (fun b => negb b) (1,true).
+Compute gmap tprod nat nat (fun a => a + 1) bool bool (fun b => negb b) (1,true).
 (* tmaybe is a self defined type, definition in 'univ.v' *)
-Compute gmap tmaybe _ bool (fun _ => false) (inl tt). (* ~ Nothing *)
-Compute gmap tmaybe _ _ (fun n => false) (inr 3). (* ~ Just 3 *)
-Compute gmap teither _ _ (fun _ => false) _ _ (fun _ => true) (inl tt).
+Compute gmap tmaybe _ bool (fun _ => false) (inl tt). (* = inl () *)
+Compute gmap tmaybe nat nat (fun n => n + 1) (inr 3). (* = inr 4 *)
+(* teither is a self defined type, definition in 'univ.v' *)
+Compute gmap teither _ bool (fun _ => false)
+                     _ bool (fun _ => true) (inl tt). (* = inl false *)
 
 (***********************************************************************)
 (* with these datatype-genericity done, now just need to add arity-gen *)
