@@ -47,8 +47,8 @@ Definition vhd (A : Type) (n : nat) (v : vec A (S n)) : A :=
 
 (* quantify a vector *)
 Fixpoint quantify (A : Type) (n : nat)
-  : (vec A n -> Set) -> Set :=
-    match n return (vec A n -> Set) -> Set with
+  : (vec A n -> Type) -> Type :=
+    match n return (vec A n -> Type) -> Type with
     | O => fun f => f (vnil _)
     | S n' => fun f => forall a : A,
                 quantify (fun As => f (vcons a As))
@@ -56,8 +56,8 @@ Fixpoint quantify (A : Type) (n : nat)
  
 (* curry for arity-genericity *)
 Fixpoint curry (A : Type) (n : nat)
-  : forall (G : vec A n -> Set), (forall X : vec A n, G X) -> quantify G :=
-    match n return forall (G : vec A n -> Set),
+  : forall (G : vec A n -> Type), (forall X : vec A n, G X) -> quantify G :=
+    match n return forall (G : vec A n -> Type),
     (forall X : vec A n, G X) -> quantify G with
     | O => fun _ f => f (vnil _)
     | S n' => fun _ f => (fun (a:A) =>
@@ -67,7 +67,7 @@ Fixpoint curry (A : Type) (n : nat)
 Definition vec_nil_case {A : Type} (v : vec A 0) : v = vnil A :=
   match v with (vnil _) => eq_refl end.
 
-Lemma veq_hdtl {A : Type} {n : nat} (v : vec A (S n)) :
+Definition veq_hdtl {A : Type} {n : nat} (v : vec A (S n)) :
   v = vcons (vhd v) (vtl v).
 Proof.
   apply rectS with (v := v).
@@ -84,7 +84,7 @@ Proof.
 Defined.
 
 Fixpoint uncurry' (n : nat) (A : Type) {struct n}
-  : forall (G : vec A n -> Set), quantify G -> forall (va : vec A n), G va.
+  : forall (G : vec A n -> Type), quantify G -> forall (va : vec A n), G va.
 Proof.
   intros G f va. induction n as [| n' IH].
   - hnf in f. pose proof vec_nil_case va as H. rewrite H. exact f.
@@ -104,12 +104,24 @@ Fixpoint zap (A B : Type) (n : nat) (vf : vec (A -> B) n)
   : vec A n -> vec B n :=
   match vf in vec _ n return vec _ n -> vec _ n with
   | vnil _ => fun _ => vnil _
-  | vcons f vf' => fun m =>
-                            vcons (f (vhd m)) (zap vf' (vtl m))
+  | vcons f vf' => fun m => vcons (f (vhd m)) (zap vf' (vtl m))
+  end.
+
+Fixpoint zaps (A B : Set) (n : nat) (vf : vec (A -> B) n)
+  : vec A n -> vec B n :=
+  match vf in vec _ n return vec _ n -> vec _ n with
+  | vnil _ => fun _ => vnil _
+  | vcons f vf' => fun m => vcons (f (vhd m)) (zap vf' (vtl m))
   end.
 
 (* construct a vector with n elements of a:A *)
 Fixpoint repeat (n : nat) (A : Type) (a : A) : vec A n :=
+  match n with
+  | O => vnil _
+  | S n' => vcons a (repeat _ a)
+  end.
+
+Fixpoint repeats (n : nat) (A : Set) (a : A) : vec A n :=
   match n with
   | O => vnil _
   | S n' => vcons a (repeat _ a)

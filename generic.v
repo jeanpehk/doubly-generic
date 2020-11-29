@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 Set Universe Polymorphism.
 
-From Coq Require Import Program List.
+From Coq Require Import Program List Datatypes.
 Import ListNotations.
 
 Require Import univ utils.
@@ -24,28 +24,38 @@ Require Import univ utils.
 (* so b is literally the way to construct the type of the operation
       e.g. Map : vec Set 2 -> Set
       Map (A :: B :: []) = A -> B *)
-Fixpoint kit (n : nat) (k : kind) (b : vec Set (S n) -> Set)
-  : vec (decodeKind k) (S n) -> Set :=
-    match k return vec (decodeKind k) (S n) -> Set with
+Fixpoint kit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
+  : vec (decodeKind k) (S n) -> Type :=
+    match k return vec (decodeKind k) (S n) -> Type with
     | Ty => fun vs => b vs
     | F k1 k2 => fun vs => quantify (fun As => kit k1 b As ->
                                                kit k2 b (zap vs As))
     end.
 
+Fixpoint unkit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
+  : vec (decodeKind k) (S n) -> Type :=
+    match k return vec (decodeKind k) (S n) -> Type with
+    | Ty => fun vs => b vs
+    | F k1 k2 => fun vs =>
+        forall (a : vec (decodeKind k1) _),
+        kit k1 b a ->
+        unkit k2 b (zap vs a)
+    end.
+
 (* type for mapping constants to a value *)
-Definition tyConstEnv (n : nat) (b : vec Set (S n) -> Set) : Set :=
+Definition tyConstEnv (n : nat) (b : vec Type (S n) -> Type) : Type :=
   forall (k:kind) (c:const k), kit k b (repeat _ (decodeClosed (Con _ c))).
 
 Section cmap.
   (* An example of defining constants for map *)
 
   (* type for the operation aka: [a,b] to (a -> b) *)
-  Definition Map : vec Set 2 -> Set :=
+  Definition Map : vec Type 2 -> Type :=
     fun vs => vhd vs -> vhd (vtl vs).
 
   (* helper for mapConst *)
-  Definition doSum (A1 B1 : Set)
-    : (A1 -> B1) -> forall (A2 B2 : Set), (A2 -> B2) -> (A1 + A2) -> (B1 + B2) :=
+  Definition doSum (A1 B1 : Type)
+    : (A1 -> B1) -> forall (A2 B2 : Type), (A2 -> B2) -> (A1 + A2) -> (B1 + B2) :=
     fun f =>
       fun _ _ g sa =>
         match sa with
@@ -54,15 +64,16 @@ Section cmap.
         end.
 
   (* helper for mapConst *)
-  Definition doProd (A1 B1 : Set)
-    : (A1 -> B1) -> forall (A2 B2 : Set), (A2 -> B2) -> (A1 * A2) -> (B1 * B2) :=
+  Definition doProd (A1 B1 : Type)
+    : (A1 -> B1) -> forall (A2 B2 : Type), (A2 -> B2) -> (A1 * A2) -> (B1 * B2) :=
     fun f _ _ g sa => (f (fst sa), g (snd sa)).
 
   (* Example of building a function for mapping constants to a value. *)
   Definition mapConst : tyConstEnv Map :=
     fun k c =>
       match c in const k
-      return kit _ Map (repeat _ (decodeClosed (Con _ c))) with
+      return kit k Map (repeat _ (decodeClosed (Con _ c)))
+      with
       | Nat => fun n => n
       | Unit => fun _ => tt
       | Prod => doProd
@@ -76,7 +87,7 @@ Section terms.
  (* section for term specialization *)
 
   (* env of kind-indexed types *)
-  Inductive ngenv (n : nat) (b : vec Set (S n) -> Set) : ctx -> Type :=
+  Inductive ngenv (n : nat) (b : vec Type (S n) -> Type) : ctx -> Type :=
     | nnil : ngenv b nil
     | ncons : forall {k} {G} (a : vec (decodeKind k) (S n)),
         kit k b a -> ngenv b G -> ngenv b (cons k G).
@@ -106,7 +117,7 @@ Section terms.
   Admitted.
 
   (* kit equality *)
-  Definition eqkit : forall (n : nat) (k : kind) (b : vec Set (S n) -> Set)
+  Definition eqkit : forall (n : nat) (k : kind) (b : vec Type (S n) -> Type)
     (t1 t2 : vec (decodeKind k) (S n)),
     t1 = t2 -> kit k b t1 -> kit k b t2.
   Proof.
@@ -115,7 +126,7 @@ Section terms.
 
   (* turn an ngenv to a vector of envs *)
   (* use '@' to provide implicits explicitly *)
-  Fixpoint transpose {n : nat} {b : vec Set (S n) -> Set}
+  Fixpoint transpose {n : nat} {b : vec Type (S n) -> Type}
     {G : ctx} (nge : ngenv b G)
     : vec (env G) (S n) :=
       match nge with
@@ -229,7 +240,7 @@ Section terms.
   Defined.*)
 
   (* Lookup a type for var from nge  *)
-  Fixpoint nlookup (n : nat) (k : kind) (b : vec Set (S n) -> Set) (G : ctx)
+  Fixpoint nlookup (n : nat) (k : kind) (b : vec Type (S n) -> Type) (G : ctx)
     (v : tyvar G k) (nge : ngenv b G) :
     kit k b (interp' (Var v) (transpose nge)).
   Proof.
@@ -260,7 +271,7 @@ Section terms.
          *)
 
   (* term specialization with non-empty context *)
-  Fixpoint ngen' (n : nat) (b : vec Set (S n) -> Set)
+  Fixpoint ngen' (n : nat) (b : vec Type (S n) -> Type)
     (G : ctx) (k : kind) (t : typ G k)
     : forall (ve : ngenv b G) (ce : tyConstEnv b),
     kit k b (interp' t (transpose ve)) :=
@@ -283,7 +294,7 @@ Section terms.
     end.
 
   (* term specialization in an empty context. *)
-  Definition ngen (n : nat) (b : vec Set (S n) -> Set) (k : kind) (t : ty k)
+  Definition ngen (n : nat) (b : vec Type (S n) -> Type) (k : kind) (t : ty k)
   (ce : tyConstEnv b) : kit k b (repeat (S n) (decodeClosed t)) :=
   eqkit k b (c6 _ _ _ ) (ngen' t (nnil _) ce).
 
@@ -314,16 +325,12 @@ Fixpoint funTy {n : nat} (v : vec Type (S n)) : Type :=
   | @vcons _ (S n') x xs => x -> funTy xs
   end.
 
-(* helpers for incoming example definitions *)
-Definition pr : decodeKind (F Ty (F Ty Ty)) := prod.
-Definition sm : decodeKind (F Ty (F Ty Ty)) := sum.
-
 Section argm.
   (* example of the functionality that the user needs to provide *)
   (* aka how doubly-generic map works for constants *)
 
   (* nat constant for nmapconst *)
-  Fixpoint cNat (n : nat) : kit Ty funTy (repeat (S n) nat) :=
+  Fixpoint cNat (n : nat) : kit Ty funTy (repeat (S n) _) :=
     let f := (fix cNat' (n' : nat)
       : kit Ty funTy (repeat (S n') nat) :=
       match n' return kit Ty funTy (repeat (S n') nat) with
@@ -341,60 +348,145 @@ Section argm.
     end.
 
   (* unit constant for nmapconst *)
-  Fixpoint cUnit (n : nat) : kit Ty funTy (repeat (S n) unit) :=
+  Fixpoint cUnit (n : nat) : kit Ty funTy (repeat (S n) _) :=
     match n with
     | O => tt
     | S n' => fun x => cUnit n'
     end.
 
-  Fixpoint hProd (n : nat) {struct n}
-    : forall (va : vec Type (S n)), funTy va
-    -> forall (vb : vec Type (S n)), funTy vb
-    -> funTy (zap (zap (repeat _ prod) va) vb).
-  Proof. Admitted.
+  (* Error axiom for finishing defs in sums *)
+  Axiom error : False.
 
-  (* helper for defining sums *)
+  (* helpers for defining sums *)
+  Fixpoint hSumLeft (n : nat)
+    : forall (va : vec Type (S n)), funTy va ->
+    forall (vb : vec Type (S n)), funTy (zap (zap (repeat _ sum) va) vb).
+  Proof.
+    intros VA a VB. simpl.
+    pose proof veq_hdtl VA as pfa;
+    pose proof veq_hdtl VB as pfb.
+    destruct n as [| n'].
+    - rewrite pfa in a. apply (inl a).
+    - intros x. destruct x.
+      + rewrite pfa in a. simpl in a.
+        pose proof a v as pa.
+        pose proof hSumLeft _ _ pa (vtl VB) as pf.
+        apply pf.
+      + pose proof error as err. exfalso; apply err.
+  Defined.
+
+  Fixpoint hSumRight (n : nat)
+    : forall (va : vec Type (S n)) (vb : vec Type (S n)),
+    funTy vb -> funTy (zap (zap (repeat _ sum) va) vb).
+  Proof.
+    intros VA VB b. pose proof veq_hdtl VB as pfb.
+    destruct n as [| n'].
+    - rewrite pfb in b. apply (inr b).
+    - intros x; destruct x as [left | right].
+      + exfalso; apply error.
+      + rewrite pfb in b. simpl in b.
+        pose proof b right as pb.
+        pose proof hSumRight n' (vtl VA)  (vtl VB) pb  as pf.
+        apply pf.
+  Defined.
+
   Definition hSum (n : nat)
     : forall (va : vec Type (S n)), funTy va
     -> forall (vb : vec Type (S n)), funTy vb
     -> funTy (zap (zap (repeat _ sum) va) vb).
   Proof.
+    intros VA a VB b.
+    destruct n as [| n'].
+    (* no arguments, chooses arbitrary case inr *)
+    - simpl. rewrite veq_hdtl in b. simpl in b. apply (inr b).
+    - intros x; destruct x as [lr | rt].
+      + rewrite veq_hdtl in a. simpl in a.
+        pose proof a lr as pfa.
+        apply hSumLeft; apply pfa.
+      + rewrite veq_hdtl in b. simpl in b.
+        pose proof b rt as pfb.
+        apply hSumRight; apply pfb.
+ Defined.
+
+  (* sum constant for nmapconst *)
+  Definition cSum (n : nat) : kit (F Ty (F Ty Ty)) funTy (repeat (S n) sum).
+  Proof.
   Admitted.
 
-  (* helper for defining prods
+  Program Fixpoint kindCurry (k : kind) (n : nat) (b : vec Type (S n) -> Type)
+    : forall v : vec (decodeKind k) (S n),
+    unkit k b v -> kit k b v :=
+    match k
+    return forall v : vec (decodeKind k) (S n),
+    unkit k b v -> kit k b v
+    with
+    | Ty => _
+    | F k1 k2 => fun v vs =>
+        curry (fun (x:vec (decodeKind k1) _) =>
+              kit k1 b x ->
+              kit k2 b (zap v x))
+              (fun As y => kindCurry k2 _ (zap v As) (vs As y))
+    end.
+
+  (* [a, b], [c,d] => [(a, c)], [(b, d)] => (a, c) -> (b, d) *)
+
+  (* no fucking clue if correct dadadaaa *)
   Fixpoint hProd (n : nat)
     : forall (va : vec Type (S n)), funTy va
     -> forall (vb : vec Type (S n)), funTy vb
-    -> funTy (zap (zap (repeat _ prod) va) vb) :=
-      fun va =>
-      match va in vec _ (S n)
-      return funTy va -> forall (vb : vec Type (S n)),
-      funTy vb -> funTy (zap (zap (repeat _ prod) va) vb) with
-      | @vcons _ O A As => fun a _ b => (a, b)
-      | @vcons _ (S m) A As => fun a vb =>
-          match vb with
-          | vcons B Bs => fun b =>
-            fun p => hProd _ As (a (fst p)) Bs (b (snd p))
-          end
-      end.*)
-
-  (* sum constant for nmapconst *)
-  Definition cSum (n : nat) : kit (F Ty (F Ty Ty)) funTy (repeat (S n) sm).
-  Admitted.
+    -> funTy (zap (zap (repeat _ prod) va) vb).
+      Proof.
+        destruct n;
+        intros VA a VB b;
+        pose proof veq_hdtl VA as pfa;
+        pose proof veq_hdtl VB as pfb.
+        - apply pair.
+          + rewrite pfa in a; apply a.
+          + rewrite pfb in b; apply b.
+        - refine (fun pr => _). intros.
+          destruct pr as [pa pb].
+          apply hProd.
+          + rewrite pfa in a. apply a. apply pa.
+          + rewrite pfb in b. apply b. apply pb.
+      Defined.
 
   (* prod constant for nmapconst *)
-  Definition cProd (n : nat) : kit (F Ty (F Ty Ty)) funTy (repeat (S n) pr).
-  Admitted.
+  Fixpoint cProd (n : nat) : kit (F Ty (F Ty Ty)) funTy (repeat (S n) prod).
+  Proof.
+    apply (kindCurry (F Ty (F Ty Ty))).
+    simpl. intros VA a VB b.
+    pose proof hProd VA a VB b as hp.
+    simpl in hp.
+    apply hp.
+  Defined.
 
-  Definition nmapConst {n : nat} : tyConstEnv (@funTy n) :=
-    fun k c =>
-      match c in const k with
-      (*in const k return kit _ Map (repeat _ (decodeClosed (Con _ c))) with *)
-      | Nat => cNat _
-      | Unit => cUnit _
-      | Prod => cProd _
-      | Sum => cSum _
-      end.
+  Fixpoint nmapConst {n : nat} : tyConstEnv (@funTy n).
+  refine (fun k c => _).
+  refine
+  (match c with
+    | Nat => _
+    | Unit => _
+    | Prod => _
+    | Sum => _
+    end
+  ).
+  (* this just returns 0 for all,
+     maybe change to return last nat given (like cNat) *)
+  - induction n.
+    + simpl. apply (cNat 0).
+    + refine (fun x => _). apply IHn.
+  - induction n.
+    + apply tt.
+    + refine (fun x => _). apply IHn.
+  - pose proof (kindCurry (F Ty (F Ty Ty))) as pf.
+    apply pf. simpl. intros VA a VB b.
+    pose proof hSum VA a VB b as hp. simpl in hp.
+    apply hp.
+  - pose proof (kindCurry (F Ty (F Ty Ty))) as pf.
+    apply pf. simpl. intros VA a VB b.
+    pose proof hProd VA a VB b as hp. simpl in hp.
+    apply hp.
+  Defined.
 
 End argm.
 
@@ -413,30 +505,14 @@ Section eq.
     | @vcons _ (S m) x xs => fun _ => geqFalse xs
     end.
 
-  (* wrong *)
-  Fixpoint eqNat (n : nat) : kit Ty geq (repeat (S n) nat) :=
-    let f := (fix eqNat' (n' : nat) : kit Ty geq (repeat (S n') nat) :=
-      match n' return kit Ty geq (repeat (S n') nat) with
-      | O => fun _ => true
-      | S O => fun a b => Nat.eqb a b
-      | S (S m) =>
-          fun a b => if Nat.eqb a b then (eqNat m) else geqFalse (repeat _ nat)
-          (*
-      | S (S m) => fun a b =>
-          if eqb a b then eqNat m else geqFalse (repeat _ nat)
-          *)
-    end) in
-      match n return kit Ty geq (repeat (S n) nat) with
-      | O => fun _ => true
-      | S O => fun a b => Nat.eqb a b
-      | S n => fun a b => if Nat.eqb a b then (f n) a else geqFalse (repeat _ nat)
-          (*
-      | O => fun _ => true
-      | S O => fun a b => eqb a b
-      | S (S m) => fun a b =>
-          if eqb a b then f (S m) b else geqFalse (repeat _ nat)
-          *)
-      end.
+  Program Fixpoint eqNat (n : nat) {measure n} : kit Ty geq (repeat (S n) nat) :=
+    match n with
+    | O => fun _ => true
+    | S O => fun a b => Nat.eqb a b
+    | S (S m) => fun a b =>
+        if Nat.eqb a b then eqNat (S m) b
+                       else geqFalse (repeat _ nat)
+    end.
 
   Fixpoint eqUnit (n : nat) : kit Ty geq (repeat (S n) unit) :=
     match n with
@@ -444,22 +520,42 @@ Section eq.
     | S n' => fun _ => eqUnit n'
     end.
 
-  (* sum constant for nmapconst *)
-  Definition eqProd (n : nat) : kit (F Ty (F Ty Ty)) geq (repeat (S n) pr).
+  Fixpoint heqProd (n : nat)
+    : forall (va : vec Type (S n)), geq va
+    -> forall (vb : vec Type (S n)), geq vb
+    -> geq (zap (zap (repeat _ prod) va) vb).
+  Proof.
+    intros. destruct n.
+    - simpl. refine (fun pr => _).
+      apply true.
+    - simpl; intros pr. destruct pr as [a b].
+      apply heqProd.
   Admitted.
 
-  Definition eqSum (n : nat) : kit (F Ty (F Ty Ty)) geq (repeat (S n) sm).
+  Definition heqSum (n : nat)
+    : forall (va : vec Type (S n)), geq va
+    -> forall (vb : vec Type (S n)), geq vb
+    -> geq (zap (zap (repeat _ sum) va) vb).
+  Proof. Admitted.
+
+  (* sum constant for neqconst  *)
+  Fixpoint eqProd (n : nat) : kit (F Ty (F Ty Ty)) geq (repeat (S n) prod). Admitted.
+
+  Definition eqSum (n : nat) : kit (F Ty (F Ty Ty)) geq (repeat (S n) sum).
   Admitted.
 
-  Definition neqConst {n : nat} : tyConstEnv (@geq n) :=
+  (*
+  Program Fixpoint neqConst {n : nat} : tyConstEnv (@geq n) :=
     fun k c =>
-      match c in const k with
+      match c in const k
+      with
       (*in const k return kit _ Map (repeat _ (decodeClosed (Con _ c))) with *)
       | Nat => eqNat _
       | Unit => eqUnit _
       | Prod => eqProd _
       | Sum => eqSum _
       end.
+      *)
 
 End eq.
 
@@ -469,22 +565,58 @@ Definition ngmap (n : nat) (k : kind) (t : ty k)
   : kit k funTy (repeat (S n) (decodeClosed t)) :=
   ngen t nmapConst.
 
+(*
 Definition ngeq (n : nat) (k : kind) (t : ty k)
   : kit k geq (repeat (S n) (decodeClosed t)) :=
   ngen t neqConst.
+      *)
 
 (* some test examples for map *)
+
+(* some test examples for unit map *)
 Compute ngmap 0 tunit. (* = () *)
 Compute ngmap 1 tunit tt. (* = () *)
 Compute ngmap 0 tnat. (* = 0 *)
+
+(* some test examples for nat map *)
 Compute ngmap 1 tnat 1. (* = 1 *)
 Compute ngmap 2 tnat 1 2. (* = 2 *)
 Compute ngmap 3 tnat 1 2 3. (* = 3 *)
 
+(* some test examples for prod map *)
+Compute ngmap 1 tprod nat nat
+  (fun x => x + 1) bool bool (fun _ => true) (1,true).
+Compute ngmap 2 tprod nat nat nat
+  (fun x y => x + y) bool bool bool (fun x y => andb x y) (1,true) (2, false).
+Compute ngmap 3 tprod nat nat nat nat
+  (fun x y z => x + y + z) bool bool nat nat
+  (fun x y z => if andb x y then 0 else z)
+  (1,true) (2, false) (1, 100). (* = (4, 100) *)
+
+(* some test examples for sum map *)
+Compute ngmap 1 tsum nat nat
+  (fun x => x + 1) bool bool (fun _ => true) (inl 1).
+Compute ngmap 2 tsum nat nat nat
+  (fun x y => x + y) bool bool bool (fun x y => andb x y)
+  (inl 1) (inl 1).
+Compute ngmap 3 tsum nat nat nat nat
+  (fun x y z => x + y + z) bool bool nat nat
+  (fun x y z => if andb x y then 0 else z)
+  (inr true) (inr false) (inr 4). (* = inr 4 *)
+
+(* some test examples for self defined maybe *)
+Compute ngmap 1 tmaybe _ bool (fun _ => false) (inl tt). (* = inl () *)
+Compute ngmap 2 tmaybe nat nat nat (fun x => fun y => x + y)
+  (inr 3) (inr 2).
+
+(*
+(* some test examples for unit eq *)
 Compute ngeq 0 tunit tt. (* = true *)
 Compute ngeq 1 tunit tt tt. (* = true *)
+
+(* some test examples for nat eq *)
 Compute ngeq 0 tnat 1. (* = true *)
 Compute ngeq 1 tnat 1 1. (* = true *)
-Compute ngeq 2 tnat 1 1 2. (* = false *)
-Compute ngeq 3 tnat 2 1 2 3. (* = .. *)
-
+Compute ngeq 2 tnat 2 2 1. (* = false *)
+Compute ngeq 3 tnat 1 1 1 2. (* = false *)
+      *)

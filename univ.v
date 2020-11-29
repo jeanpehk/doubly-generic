@@ -1,6 +1,7 @@
 From Coq Require Import List Program.
 
 Set Implicit Arguments.
+Set Universe Polymorphism.
 Set Asymmetric Patterns.
 
 (* Set Universe Polymorphism.
@@ -8,19 +9,19 @@ Set Universe Minimization ToSet. *)
 
 (* Universe definition. *)
 
-Inductive kind : Set :=
+Inductive kind : Type :=
   | Ty : kind
   | F  : kind -> kind -> kind.
 
 (* From 'own' kinds to Coq kinds. *)
 Fixpoint decodeKind (k : kind) : Type :=
   match k with
-  | Ty => Set
+  | Ty => Type
   | F k1 k2 => decodeKind k1 -> decodeKind k2
   end.
 
 (* Constants that are indexed by kinds. *)
-Inductive const : kind -> Set :=
+Inductive const : kind -> Type :=
   | Nat : const Ty
   | Unit : const Ty
   | Sum : const (F Ty (F Ty Ty))
@@ -138,6 +139,22 @@ Fixpoint decodeType (k : kind) (G : ctx) (t : typ G k) : env G -> decodeKind k :
 Definition decodeClosed (k : kind)
   : ty k -> decodeKind k :=
   fun t => decodeType t enil.
+
+Theorem natdeceq :
+  decodeClosed (Con nil Nat) = nat.
+Proof. unfold decodeClosed; unfold decodeType. reflexivity. Defined.
+
+Theorem unitdeceq :
+  decodeClosed (Con nil Unit) = unit.
+Proof. unfold decodeClosed; unfold decodeType. reflexivity. Defined.
+
+Theorem prdeceq :
+  decodeClosed (Con nil Prod) = prod.
+Proof. unfold decodeClosed; unfold decodeType. reflexivity. Defined.
+
+Theorem smdeceq :
+  decodeClosed (Con nil Sum) = sum.
+Proof. unfold decodeClosed; unfold decodeType. reflexivity. Defined.
 
 (********* Examples: *********)
 
