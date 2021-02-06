@@ -5,6 +5,33 @@ From Coq Require Import Program.
 
 Require Import generic univ utils.
 
+(* generic helpers for making doubly generic defs *)
+
+Fixpoint unkit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
+  : vec (decodeKind k) (S n) -> Type :=
+    match k return vec (decodeKind k) (S n) -> Type with
+    | Ty => fun vs => b vs
+    | F k1 k2 => fun vs =>
+        forall (a : vec (decodeKind k1) _),
+        kit k1 b a ->
+        unkit k2 b (zap vs a)
+    end.
+
+Program Fixpoint kindCurry (k : kind) (n : nat) (b : vec Type (S n) -> Type)
+  : forall v : vec (decodeKind k) (S n),
+  unkit k b v -> kit k b v :=
+  match k
+  return forall v : vec (decodeKind k) (S n),
+  unkit k b v -> kit k b v
+  with
+  | Ty => _
+  | F k1 k2 => fun v vs =>
+      curry (fun (x:vec (decodeKind k1) _) =>
+            kit k1 b x ->
+            kit k2 b (zap v x))
+            (fun As y => kindCurry k2 _ (zap v As) (vs As y))
+  end.
+
 (* examples of defining types with the universe. *)
 Section univTypes.
 
@@ -187,25 +214,11 @@ Section aritydtgen.
         apply hSumRight; apply pfb.
  Defined.
 
+
   (* sum constant for nmapconst *)
   Definition cSum (n : nat) : kit (F Ty (F Ty Ty)) funTy (repeat (S n) sum).
   Proof.
   Admitted.
-
-  Program Fixpoint kindCurry (k : kind) (n : nat) (b : vec Type (S n) -> Type)
-    : forall v : vec (decodeKind k) (S n),
-    unkit k b v -> kit k b v :=
-    match k
-    return forall v : vec (decodeKind k) (S n),
-    unkit k b v -> kit k b v
-    with
-    | Ty => _
-    | F k1 k2 => fun v vs =>
-        curry (fun (x:vec (decodeKind k1) _) =>
-              kit k1 b x ->
-              kit k2 b (zap v x))
-              (fun As y => kindCurry k2 _ (zap v As) (vs As y))
-    end.
 
   (* helper for defining prods *)
   Fixpoint hProd (n : nat)

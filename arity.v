@@ -55,12 +55,7 @@ Fixpoint arrTy (n : nat) (v : vec Type (S n)) : Type :=
   | vcons _ (S n') x v' => x -> (arrTy _ v')
   end.
 
-(* This is allowed because of universe polymoprhism.                 *)
-(* Otherwise the following error msg:                                *)
-
-(* The term "vcons Set 1 nat (vcons Set 0 unit (vnil Set))" has type *)
-(* "vec Set 2" while it is expected to have type "vec Type 2"        *)
-(*   (universe inconsistency).                                       *)
+(* This is allowed because of universe polymoprhism. *)
 Compute arrTy 1 (vcons _ _ nat (vcons _ _ unit (vnil _))). (* = nat -> unit *)
 
 Definition arrTyVec (m n : nat) (vs : vec Type (S n)) : Type :=
@@ -95,7 +90,7 @@ Definition unitv := vcons _ _ tt (vcons _ _ tt (vnil _)).
 
 (* A simple example map with previous definitions.              *)
 (* Still need to unnecessarily provide vector of types (types)  *)
-(* and individual vectors (natv + unitv), but atleast it works. *)
+(* and individual vectors (natv + unitv).                       *)
 Definition examplemap := (nvecmap _ 2 types f) natv unitv.
 
 Compute examplemap.

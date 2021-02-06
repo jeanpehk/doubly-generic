@@ -10,6 +10,7 @@ Require Import univ utils.
 (* Generic Library *)
 
 (****** Type specialization ******)
+Section types.
 
 Fixpoint kit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
   : vec (decodeKind k) (S n) -> Type :=
@@ -19,24 +20,14 @@ Fixpoint kit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
                                                kit k2 b (zap vs As))
     end.
 
-Fixpoint unkit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
-  : vec (decodeKind k) (S n) -> Type :=
-    match k return vec (decodeKind k) (S n) -> Type with
-    | Ty => fun vs => b vs
-    | F k1 k2 => fun vs =>
-        forall (a : vec (decodeKind k1) _),
-        kit k1 b a ->
-        unkit k2 b (zap vs a)
-    end.
-
 (* type for mapping constants to a value *)
 Definition tyConstEnv (n : nat) (b : vec Type (S n) -> Type) : Type :=
   forall (k:kind) (c:const k), kit k b (repeat _ (decodeClosed (Con _ c))).
 
-(* Now what is left is term specialization and then done for type-genericity *)
+End types.
 
+(****** Term specialization ******)
 Section terms.
- (* section for term specialization *)
 
   (* env of kind-indexed types *)
   Inductive ngenv (n : nat) (b : vec Type (S n) -> Type) : ctx -> Type :=
@@ -209,38 +200,4 @@ Section terms.
   eqkit k b (c6 _ _ _ ) (ngen' t (nnil _) ce).
 
 End terms.
-
-(* mb smth ?
-Record NGen : Type := mkNGen
-  {
-    transform : forall n, vec Type (S n) -> Type;
-    cnat : forall n,
-      kit Ty (@transform n) (repeat (S n) (decodeClosed (Con [] Nat)));
-    cunit : forall n,
-      kit Ty (@transform n) (repeat (S n) (decodeClosed (Con [] Unit)));
-    csum : forall n,
-      kit (F Ty (F Ty Ty)) (@transform n) (repeat (S n) (decodeClosed (Con [] Sum)));
-    cprod : forall n,
-      kit (F Ty (F Ty Ty)) (@transform n) (repeat (S n) (decodeClosed (Con [] Prod)));
-    ngconst : forall n,
-      tyConstEnv (@transform n)
-  }.
-
-Program Definition ng := mkNGen
-  (@funTy)
-  _
-  _
-  _
-  _
-  _.
-Next Obligation.
-  induction n.
-  - apply 0.
-  - simpl; intros. apply IHn. Defined.
-Next Obligation. Admitted.
-Next Obligation. Admitted.
-Next Obligation. Admitted.
-Next Obligation. Admitted.
-
-       *)
 
