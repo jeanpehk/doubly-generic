@@ -33,7 +33,6 @@ Fixpoint decodeConst (k : kind) (c : const k) : decodeKind k :=
   | Prod => prod
   end.
 
-
 (* Context for kinds. *)
 Definition ctx : Type := list kind.
 
@@ -115,20 +114,4 @@ Fixpoint decodeType (k : kind) (G : ctx) (t : typ G k) : env G -> decodeKind k :
 Definition decodeClosed (k : kind)
   : ty k -> decodeKind k :=
   fun t => decodeType t enil.
-
-Theorem natdeceq :
-  decodeClosed (Con nil Nat) = nat.
-Proof. unfold decodeClosed; unfold decodeType. reflexivity. Defined.
-
-Theorem unitdeceq :
-  decodeClosed (Con nil Unit) = unit.
-Proof. unfold decodeClosed; unfold decodeType. reflexivity. Defined.
-
-Theorem prdeceq :
-  decodeClosed (Con nil Prod) = prod.
-Proof. unfold decodeClosed; unfold decodeType. reflexivity. Defined.
-
-Theorem smdeceq :
-  decodeClosed (Con nil Sum) = sum.
-Proof. unfold decodeClosed; unfold decodeType. reflexivity. Defined.
 
