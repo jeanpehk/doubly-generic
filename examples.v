@@ -110,7 +110,7 @@ Section dtgen.
 
   (* gmap *)
   Definition gmap (k : kind) (t : ty k) : kit k Map _ :=
-    ngen t mapConst.
+    specTerm t mapConst.
 
   (* examples  of using gmap *)
   Compute gmap tprod nat nat (fun a => a + 1) bool bool (fun b => negb b) (1,true).
@@ -286,7 +286,7 @@ Section aritydtgen.
   (* doubly generic map *)
   Definition ngmap (n : nat) (k : kind) (t : ty k)
     : kit k funTy (repeat (S n) (decodeClosed t)) :=
-    ngen t nmapConst.
+    specTerm t nmapConst.
 
   (* some test examples for unit map *)
   Compute ngmap 0 tunit. (* = () *)
