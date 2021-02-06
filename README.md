@@ -7,7 +7,7 @@ Most of this is ideas combined from these papers:
 Arity-Generic Datatype-Generic Programming (Weirich, Casinghino):
 - https://dl.acm.org/doi/pdf/10.1145/1707790.1707799
 - Considers doubly generic programming in Agda.
-- Need to use --type-in-type to keep definitions simple. To which they offer universepolymorfism as a possible solution.
+- Need to use --type-in-type to keep definitions simple. To this they offer universepolymorfism as a possible solution.
 
 Polytypic Programming in Coq (Verbruggen, de Vries, Hughes):
 - https://dl.acm.org/doi/pdf/10.1145/1411318.1411326
@@ -24,7 +24,7 @@ Main caveats:
 
 - Cumbersome to define functions with.
 - Uses --impredicative-set.
-- No datatype isomorphism (check W + C).
+- No datatype isomorphisms (check W + C).
 
 ## Build
 
@@ -50,7 +50,7 @@ A universe for doubly generic programming + interpretation functions.
 
 ### generic.v
 
-A double generic library.
+A doubly-generic library.
 
 ### utils.v
 
@@ -59,9 +59,9 @@ perform operations on them.
 
 ### examples.v
 
-Few examples of using the library.
+A few examples of using the library.
 
 ### proofs.v
 
-Few proofs of the library.
+A few proofs of the library.
 
