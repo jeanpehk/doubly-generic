@@ -1,11 +1,10 @@
 From Coq Require Import List Program.
 
+Import EqNotations.
+
 Set Implicit Arguments.
 Set Universe Polymorphism.
 Set Asymmetric Patterns.
-
-(* Set Universe Polymorphism.
-Set Universe Minimization ToSet. *)
 
 (* Universe definition. *)
 
@@ -13,7 +12,6 @@ Inductive kind : Type :=
   | Ty : kind
   | F  : kind -> kind -> kind.
 
-(* From 'own' kinds to Coq kinds. *)
 Fixpoint decodeKind (k : kind) : Type :=
   match k with
   | Ty => Type
@@ -27,7 +25,6 @@ Inductive const : kind -> Type :=
   | Sum : const (F Ty (F Ty Ty))
   | Prod : const (F Ty (F Ty Ty)).
 
-(* Decode kind of constant to a Coq kind. *)
 Fixpoint decodeConst (k : kind) (c : const k) : decodeKind k :=
   match c in const k return decodeKind k with
   | Nat => nat
@@ -36,23 +33,17 @@ Fixpoint decodeConst (k : kind) (c : const k) : decodeKind k :=
   | Prod => prod
   end.
 
-(* 'Datatype-generic operations are described by kind-indexed types.'     *)
-(* 'They have different types according to the kinds of their arguments.' *)
-
-(* 'We start with a code for types, give an interpretation of that     *)
-(*  code as an Agda type and then define the generic operation by      *)
-(*  interpreting that code as an Agda function (like geq).'            *)
 
 (* Context for kinds. *)
 Definition ctx : Type := list kind.
 
-(* Variables *)
+(* type variables *)
 Inductive tyvar : ctx -> kind -> Type :=
   | Vz : forall G k, tyvar (k :: G) k
   | Vs : forall G k k', tyvar G k -> tyvar (k' :: G) k.
 
-Import EqNotations.
-
+(* case for dependent destruction on tyvar,
+   needed for proof of 'nlookup' in generic.v *)
 Lemma tvcase :
   forall G k k' (P : tyvar (k' :: G) k -> Type),
   (*(forall (pf : k=k'), P (eq_vs (Vz G k) pf)) ->*)
@@ -77,8 +68,7 @@ Lemma tvcase :
     - intros. subst. simpl. apply (X0 t).
   Defined.
 
-(* Datatype for representing types of arbitrary kinds.    *)
-(* Indexed by the typing context and the kind of the type. *)
+(* Datatype for representing types. *)
 Inductive typ : ctx -> kind -> Type :=
   | Var : forall G k, tyvar G k -> typ G k
   | Lam : forall G k1 k2, typ (k1 :: G) k2 -> typ G (F k1 k2)
@@ -89,11 +79,7 @@ Inductive typ : ctx -> kind -> Type :=
 Definition ty : kind -> Type :=
   typ nil.
 
-(* Now we can represent type constructors,            *)
-(* what we need is a way to decode them as Coq types. *)
-
 (* Environment for kinds. *)
-(* If  '.. -> Set' then 'Large non-prop ind types must be in Type' *)
 Inductive env : list kind -> Type :=
   | enil : env nil
   | econs : forall k G, decodeKind k -> env G -> env (k :: G).
@@ -102,14 +88,6 @@ Definition envtl (k : kind) (G : ctx) (en : env (k :: G)) : env G :=
   match en with
   | econs _ _ _ G' => G'
   end.
-
-Theorem slookup' : forall (k : kind) (G : ctx) (tv : tyvar G k) (e : env G),
-  decodeKind k.
-Proof.
-  intros. induction tv.
-  - inversion e. apply X.
-  - inversion e. exact (IHtv X0).
-Defined.
 
 (* lookup a type from env *)
 Fixpoint slookup (k : kind) (G : ctx) (tv : tyvar G k) : env G -> decodeKind k :=
@@ -121,8 +99,6 @@ Fixpoint slookup (k : kind) (G : ctx) (tv : tyvar G k) : env G -> decodeKind k :
   | Vs _ _ _ x => fun env => slookup x (envtl env)
   end.
 
-(* hmm if you do '.. : typ G k -> env G ..' instead      *)
-(* doesn't understand that the function terminates       *)
 Fixpoint decodeType (k : kind) (G : ctx) (t : typ G k) : env G -> decodeKind k := 
   match t in typ G k return env G -> decodeKind k with
   | Var _ _ x => fun e =>
@@ -155,52 +131,4 @@ Proof. unfold decodeClosed; unfold decodeType. reflexivity. Defined.
 Theorem smdeceq :
   decodeClosed (Con nil Sum) = sum.
 Proof. unfold decodeClosed; unfold decodeType. reflexivity. Defined.
-
-(********* Examples: *********)
-
-(* Shorthands for constants *)
-Definition tnat := Con nil Nat.
-Definition tunit := Con nil Unit.
-Definition tsum := Con nil Sum.
-Definition tprod := Con nil Prod.
-
-(* Shorthands for constants in a context *)
-Definition tnatc := fun ctx => Con ctx Nat.
-Definition tunitc := fun ctx => Con ctx Unit.
-Definition tsumc := fun ctx => Con ctx Sum.
-Definition tprodc := fun ctx => Con ctx Prod.
-
-(* Shorthands for other types *)
-Definition tmaybe : ty (F Ty Ty) :=
-  Lam (App (App (tsumc _) (tunitc _)) (Var (Vz _ _))).
-(* \a -> \b -> (sum a) b *)
-Definition teither : ty (F Ty (F Ty Ty)) :=
-  Lam (Lam
-    (App (App (tsumc _)
-      (Var (Vs _ (Vz _ _)))) (Var (Vz _ _)))).
-
-(* Shorthands for decoding closed types *)
-Definition deNat := decodeClosed (Con _ Nat).
-Definition deUnit := decodeClosed (Con _ Unit).
-Definition deMaybe (A : Set) := decodeClosed tmaybe A.
-Definition deEither (A B : Set) := decodeClosed teither A B.
-
-(* Compute examples *)
-Compute deNat. (* = nat *)
-Compute deUnit. (* = unit *)
-Compute deMaybe. (* = fun A : Set => (unit + A) *)
-Compute deMaybe nat. (* = (unit + nat) *)
-Compute deEither. (* = fun A B : Set => (A + B) *)
-Compute deEither nat unit. (* = (nat + unit) *)
-
-Compute decodeClosed (Con _ Nat).
-
-(* Initial thougths for next phase: *)
-
-(** decodeType is a function and cannot be used in function definitions.
-   What is needed is a type level function that constructs the type of decodeType,
-   aka specType. I guess decodeKind is already the type of this function?
-   | specType : decodeKind |
-   | specTerm : specType |
-     => specType -> decodeKind **)
 

@@ -1,40 +1,67 @@
-# Doubly-generic
+# Doubly-generic programming in Coq.
 
-Doubly-generic programming. Initial examples and tests.
+A small library for arity-generic datatype-generic, or doubly-generic, programming in Coq.
 
 Most of this is ideas combined from these papers:
 
 Arity-Generic Datatype-Generic Programming (Weirich, Casinghino):
 - https://dl.acm.org/doi/pdf/10.1145/1707790.1707799
+- Considers doubly generic programming in Agda.
+- Need to use --type-in-type to keep definitions simple. To which they offer universepolymorfism as a possible solution.
 
 Polytypic Programming in Coq (Verbruggen, de Vries, Hughes):
 - https://dl.acm.org/doi/pdf/10.1145/1411318.1411326
 - Does not consider arity-genericity.
+- Kind-indexed universe (like with W + C) -> could be extended to be doubly generic.
+- Uses Coq.
 
-compile:
+Main outcome of this library:
+
+- No exising implementation for doubly-generic programming in Coq.
+- Usage of universepolymorfism to avoid --type-in-type.
+
+Main caveats:
+
+- Cumbersome to define functions with.
+- Uses --impredicative-set.
+- No datatype isomorphism (check W + C).
+
+## Build
+
+Contains a simple Makefile for compiling:
 ```bash
 $ make
 ```
 
-clean:
+Clean:
 ```bash
 $ make clean
 ```
 
-## arity.v
+## Structure
+
+### arity.v
 
 Simple arity-generic map ala Fridlender + Indrika / Weirich + Casinghino.
 
-## univ.v
+### univ.v
 
-A universe for generic programming + interpretation functions.
+A universe for doubly generic programming + interpretation functions.
 
-## generic.v
+### generic.v
 
-Trying out ideas for a generic library.
+A double generic library.
 
-## utils.v
+### utils.v
 
-Utilities. Includes e.g. types for vectors, tuples and functions that
+Utilities. Includes e.g. a type for vectors and functions that
 perform operations on them.
+
+### examples.v
+
+Few examples of using the library.
+
+### proofs.v
+
+Few proofs of the library.
 
