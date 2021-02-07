@@ -45,7 +45,7 @@ Definition vhd (A : Type) (n : nat) (v : vec A (S n)) : A :=
   | vcons a _ => a
   end.
 
-(* quantify a vector *)
+(* quantify a vector to express arity-genericity *)
 Fixpoint quantify (A : Type) (n : nat)
   : (vec A n -> Type) -> Type :=
     match n return (vec A n -> Type) -> Type with
@@ -60,7 +60,7 @@ Fixpoint curry (A : Type) (n : nat)
     match n return forall (G : vec A n -> Type),
     (forall X : vec A n, G X) -> quantify G with
     | O => fun _ f => f (vnil _)
-    | S n' => fun _ f => (fun (a:A) =>
+    | S n' => fun _ f => (fun a:A =>
                 curry _ (fun As => f (vcons a As)))
     end.
 
@@ -107,21 +107,8 @@ Fixpoint zap (A B : Type) (n : nat) (vf : vec (A -> B) n)
   | vcons f vf' => fun m => vcons (f (vhd m)) (zap vf' (vtl m))
   end.
 
-Fixpoint zaps (A B : Set) (n : nat) (vf : vec (A -> B) n)
-  : vec A n -> vec B n :=
-  match vf in vec _ n return vec _ n -> vec _ n with
-  | vnil _ => fun _ => vnil _
-  | vcons f vf' => fun m => vcons (f (vhd m)) (zap vf' (vtl m))
-  end.
-
 (* construct a vector with n elements of a:A *)
 Fixpoint repeat (n : nat) (A : Type) (a : A) : vec A n :=
-  match n with
-  | O => vnil _
-  | S n' => vcons a (repeat _ a)
-  end.
-
-Fixpoint repeats (n : nat) (A : Set) (a : A) : vec A n :=
   match n with
   | O => vnil _
   | S n' => vcons a (repeat _ a)

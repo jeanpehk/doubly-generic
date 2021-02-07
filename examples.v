@@ -5,33 +5,6 @@ From Coq Require Import Program.
 
 Require Import generic univ utils.
 
-(* generic helpers for making doubly generic defs *)
-
-Fixpoint unkit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
-  : vec (decodeKind k) (S n) -> Type :=
-    match k return vec (decodeKind k) (S n) -> Type with
-    | Ty => fun vs => b vs
-    | F k1 k2 => fun vs =>
-        forall (a : vec (decodeKind k1) _),
-        kit k1 b a ->
-        unkit k2 b (zap vs a)
-    end.
-
-Program Fixpoint kindCurry (k : kind) (n : nat) (b : vec Type (S n) -> Type)
-  : forall v : vec (decodeKind k) (S n),
-  unkit k b v -> kit k b v :=
-  match k
-  return forall v : vec (decodeKind k) (S n),
-  unkit k b v -> kit k b v
-  with
-  | Ty => _
-  | F k1 k2 => fun v vs =>
-      curry (fun (x:vec (decodeKind k1) _) =>
-            kit k1 b x ->
-            kit k2 b (zap v x))
-            (fun As y => kindCurry k2 _ (zap v As) (vs As y))
-  end.
-
 (* examples of defining types with the universe. *)
 Section univTypes.
 
@@ -126,23 +99,25 @@ End dtgen.
 (* Example of a arity-generic and datatype-generic function. *)
 Section aritydtgen.
 
+  (* helpers for making doubly generic defs *)
+
   (* type definition needed for doubly generic map *)
-  Fixpoint funTy {n : nat} (v : vec Type (S n)) : Type :=
+  Fixpoint nMap {n : nat} (v : vec Type (S n)) : Type :=
     match v with
     | @vcons _ O x xs => x
-    | @vcons _ (S n') x xs => x -> funTy xs
+    | @vcons _ (S n') x xs => x -> nMap xs
     end.
 
   (* nat constant for nmapconst *)
-  Fixpoint cNat (n : nat) : kit Ty funTy (repeat (S n) _) :=
+  Fixpoint cNat (n : nat) : kit Ty nMap (repeat (S n) _) :=
     let f := (fix cNat' (n' : nat)
-      : kit Ty funTy (repeat (S n') nat) :=
-      match n' return kit Ty funTy (repeat (S n') nat) with
+      : kit Ty nMap (repeat (S n') nat) :=
+      match n' return kit Ty nMap (repeat (S n') nat) with
       | O => O
       | S O => fun x => x
       | S (S m) => fun x y => cNat' m
     end) in
-    match n return kit Ty funTy (repeat (S n) nat) with
+    match n return kit Ty nMap (repeat (S n) nat) with
     | O => O
     | S O => fun x => x
     | (S (S m)) =>
@@ -152,7 +127,7 @@ Section aritydtgen.
     end.
 
   (* unit constant for nmapconst *)
-  Fixpoint cUnit (n : nat) : kit Ty funTy (repeat (S n) _) :=
+  Fixpoint cUnit (n : nat) : kit Ty nMap (repeat (S n) _) :=
     match n with
     | O => tt
     | S n' => fun x => cUnit n'
@@ -161,10 +136,10 @@ Section aritydtgen.
   (* Error axiom for finishing defs in sums *)
   Axiom error : False.
 
-  (* helpers for defining sums *)
+  (* helper for defining left-side cases of sums *)
   Fixpoint hSumLeft (n : nat)
-    : forall (va : vec Type (S n)), funTy va ->
-    forall (vb : vec Type (S n)), funTy (zap (zap (repeat _ sum) va) vb).
+    : forall (va : vec Type (S n)), nMap va ->
+    forall (vb : vec Type (S n)), nMap (zap (zap (repeat _ sum) va) vb).
   Proof.
     intros VA a VB. simpl.
     pose proof veq_hdtl VA as pfa;
@@ -180,9 +155,10 @@ Section aritydtgen.
       + pose proof error as err. exfalso; apply err.
   Defined.
 
+  (* helper for defining right-side cases of sums *)
   Fixpoint hSumRight (n : nat)
     : forall (va : vec Type (S n)) (vb : vec Type (S n)),
-    funTy vb -> funTy (zap (zap (repeat _ sum) va) vb).
+    nMap vb -> nMap (zap (zap (repeat _ sum) va) vb).
   Proof.
     intros VA VB b. pose proof veq_hdtl VB as pfb.
     destruct n as [| n'].
@@ -196,10 +172,11 @@ Section aritydtgen.
         apply pf.
   Defined.
 
+  (* case for sums in curried form  *)
   Definition hSum (n : nat)
-    : forall (va : vec Type (S n)), funTy va
-    -> forall (vb : vec Type (S n)), funTy vb
-    -> funTy (zap (zap (repeat _ sum) va) vb).
+    : forall (va : vec Type (S n)), nMap va
+    -> forall (vb : vec Type (S n)), nMap vb
+    -> nMap (zap (zap (repeat _ sum) va) vb).
   Proof.
     intros VA a VB b.
     destruct n as [| n'].
@@ -214,17 +191,11 @@ Section aritydtgen.
         apply hSumRight; apply pfb.
  Defined.
 
-
-  (* sum constant for nmapconst *)
-  Definition cSum (n : nat) : kit (F Ty (F Ty Ty)) funTy (repeat (S n) sum).
-  Proof.
-  Admitted.
-
-  (* helper for defining prods *)
+  (* case for prods in curried form  *)
   Fixpoint hProd (n : nat)
-    : forall (va : vec Type (S n)), funTy va
-    -> forall (vb : vec Type (S n)), funTy vb
-    -> funTy (zap (zap (repeat _ prod) va) vb).
+    : forall (va : vec Type (S n)), nMap va
+    -> forall (vb : vec Type (S n)), nMap vb
+    -> nMap (zap (zap (repeat _ prod) va) vb).
       Proof.
         destruct n;
         intros VA a VB b;
@@ -240,17 +211,8 @@ Section aritydtgen.
           + rewrite pfb in b. apply b. apply pb.
       Defined.
 
-  (* prod constant for nmapconst *)
-  Fixpoint cProd (n : nat) : kit (F Ty (F Ty Ty)) funTy (repeat (S n) prod).
-  Proof.
-    apply (kindCurry (F Ty (F Ty Ty))).
-    simpl. intros VA a VB b.
-    pose proof hProd VA a VB b as hp.
-    simpl in hp.
-    apply hp.
-  Defined.
-
-  Fixpoint nmapConst {n : nat} : tyConstEnv (@funTy n).
+  (* Combined cases for the generic constants *)
+  Definition nmapConst {n : nat} : tyConstEnv (@nMap n).
   refine (fun k c => _).
   refine
   (match c with
@@ -260,9 +222,7 @@ Section aritydtgen.
     | Sum => _
     end
   ).
-  (* CASE FOR NAT
-    this just returns 0 for all,
-     maybe change to return last nat given (like cNat) *)
+  (* CASE FOR NAT *)
   - induction n.
     + simpl. apply (cNat 0).
     + refine (fun x => _). apply IHn.
@@ -271,21 +231,16 @@ Section aritydtgen.
     + apply tt.
     + refine (fun x => _). apply IHn.
   (* CASE FOR SUM *)
-  - pose proof (kindCurry (F Ty (F Ty Ty))) as pf.
-    apply pf. simpl. intros VA a VB b.
-    pose proof hSum VA a VB b as hp. simpl in hp.
-    apply hp.
+  - apply (curryKind (F Ty (F Ty Ty))); simpl.
+    apply hSum.
   (* CASE FOR PROD *)
-  - pose proof (kindCurry (F Ty (F Ty Ty))) as pf.
-    apply pf. simpl. intros VA a VB b.
-    pose proof hProd VA a VB b as hp. simpl in hp.
-    apply hp.
+  - apply (curryKind (F Ty (F Ty Ty))); simpl.
+    apply hProd.
   Defined.
-
 
   (* doubly generic map *)
   Definition ngmap (n : nat) (k : kind) (t : ty k)
-    : kit k funTy (repeat (S n) (decodeClosed t)) :=
+    : kit k nMap (repeat (S n) (decodeClosed t)) :=
     specTerm t nmapConst.
 
   (* some test examples for unit map *)
@@ -299,31 +254,39 @@ Section aritydtgen.
   Compute ngmap 3 tnat 1 2 3. (* = 3 *)
 
   (* some test examples for prod map *)
-  Compute ngmap 1 tprod _ _
-    (fun x => x + 1) _ _ (fun _ => true) (1,false).
-  Compute ngmap 2 tprod nat nat nat
-    (fun x y => x + y) bool bool bool (fun x y => andb x y) (1,true) (2, false).
-  Compute ngmap 3 tprod nat nat nat nat
-    (fun x y z => x + y + z) bool bool nat nat
-    (fun x y z => if andb x y then 0 else z)
-    (1,true) (2, false) (1, 100). (* = (4, 100) *)
+  Compute ngmap 1 tprod
+    _ _ (fun x => x + 1)
+    _ _ (fun _ => true)
+    (1,false).
+  Compute ngmap 2 tprod
+    nat nat nat (fun x y => x + y)
+    bool bool bool (fun x y => andb x y)
+    (15,true) (4, false).
+  Compute ngmap 3 tprod
+    _ _ _ _ (fun x y z => x + y + z)
+    _ _ _ _ (fun x y z => andb (andb x y) z)
+    (11,true) (2, true) (6, true). (* = (19, true) *)
 
   (* some test examples for sum map *)
   Compute ngmap 1 tsum
     _ _ (fun x => x + 1)
     _ _ (fun _ => true)
     (inl 1). (* = inl 2 *)
-  Compute ngmap 2 tsum nat nat nat
-    (fun x y => x + y) bool bool bool (fun x y => andb x y)
-    (inl 1) (inl 1).
-  Compute ngmap 3 tsum nat nat nat nat
-    (fun x y z => x + y + z) bool bool nat nat
-    (fun x y z => if andb x y then 0 else z)
+  Compute ngmap 2 tsum
+    _ _ _ (fun x y => x + y)
+    _ _ _ (fun x y => andb x y)
+    (inl 2) (inl 5). (* = inl 7 *)
+  Compute ngmap 3 tsum
+    _ _ _ _ (fun x y z => x + y + z)
+    _ _ _ _ (fun x y z => if andb x y then 0 else z)
     (inr true) (inr false) (inr 4). (* = inr 4 *)
 
   (* some test examples for self defined tmaybe *)
-  Compute ngmap 1 tmaybe _ bool (fun _ => false) (inl tt). (* = inl () *)
-  Compute ngmap 2 tmaybe nat nat nat (fun x => fun y => x + y)
-    (inr 3) (inr 2).
+  Compute ngmap 1 tmaybe
+    _ _ (fun _ => false)
+    (inl tt). (* = inl () *)
+  Compute ngmap 2 tmaybe
+    _ _ _ (fun x => fun y => x + y)
+    (inr 3) (inr 2). (* = inr 5 *)
 
 End aritydtgen.

@@ -1,4 +1,4 @@
-From Coq Require Import List Program.
+From Coq Require Import List.
 
 Import EqNotations.
 

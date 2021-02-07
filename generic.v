@@ -6,7 +6,6 @@ Import ListNotations.
 
 Require Import univ utils.
 
-
 (* Generic Library *)
 
 (* Most of the type signatures and the general structure of the library from
@@ -30,6 +29,17 @@ Fixpoint kit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
     | Ty => fun vs => b vs
     | F k1 k2 => fun vs => quantify (fun As => kit k1 b As ->
                                                kit k2 b (zap vs As))
+    end.
+
+(* version of kit with arguments curried for easier proofs. *)
+Fixpoint unkit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
+  : vec (decodeKind k) (S n) -> Type :=
+    match k return vec (decodeKind k) (S n) -> Type with
+    | Ty => fun vs => b vs
+    | F k1 k2 => fun vs =>
+        forall (a : vec (decodeKind k1) _),
+        kit k1 b a ->
+        unkit k2 b (zap vs a)
     end.
 
 (* Type for mapping constants to a value.
@@ -72,6 +82,22 @@ Section terms.
       | nnil _ => repeat _ enil
       | ncons a _ ste => zap (zap (repeat _ (@econs _ _)) a) (transpose ste)
       end.
+
+  (* currykinds for occasionally easier proos. *)
+  Program Fixpoint curryKind (k : kind) (n : nat) (b : vec Type (S n) -> Type)
+    : forall v : vec (decodeKind k) (S n),
+    unkit k b v -> kit k b v :=
+    match k
+    return forall v : vec (decodeKind k) (S n),
+    unkit k b v -> kit k b v
+    with
+    | Ty => _
+    | F k1 k2 => fun v vs =>
+        curry (fun (x:vec (decodeKind k1) _) =>
+              kit k1 b x ->
+              kit k2 b (zap v x))
+              (fun As y => curryKind k2 _ (zap v As) (vs As y))
+    end.
 
   (* PROOFS to help with term specialization,
      type signatures from definitions by Weirich + Casinghino. *)
@@ -171,7 +197,7 @@ Section terms.
   (** Lookup a type for var from stenv.
       Requires a self defined lemma 'tvcase' for destructing v.
       Done following the idea presented by James Wilcox in:
-      - https://jamesrwilcox.com/dep-destruct.html              **)
+      - https://jamesrwilcox.com/dep-destruct.html               **)
   Fixpoint nlookup (n : nat) (k : kind) (b : vec Type (S n) -> Type) (G : ctx)
     (v : tyvar G k) (ste : stenv b G) :
     kit k b (interpToVec (Var v) (transpose ste)).
