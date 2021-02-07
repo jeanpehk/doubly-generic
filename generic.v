@@ -244,3 +244,20 @@ Section terms.
 
 End terms.
 
+
+(* A Record interface for defining generic functions with the library.
+    - transform is the form of the types for the base cases.
+    - rest are cases for defining behaviour for the base cases.        *)
+Record NGen (n : nat) : Type := nGen
+  {
+    transform : vec Type (S n) -> Type;
+    cunit :
+      kit Ty transform (repeat (S n) (decodeClosed (Con [] Unit)));
+    cnat :
+      kit Ty transform (repeat (S n) (decodeClosed (Con [] Nat)));
+    csum :
+      kit (F Ty (F Ty Ty)) transform (repeat (S n) (decodeClosed (Con [] Sum)));
+    cprod :
+      kit (F Ty (F Ty Ty)) transform (repeat (S n) (decodeClosed (Con [] Prod)));
+  }.
+

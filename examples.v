@@ -1,7 +1,9 @@
 Set Implicit Arguments.
 Set Universe Polymorphism.
 
-From Coq Require Import Program.
+From Coq Require Import Program List.
+
+Import ListNotations.
 
 Require Import generic univ utils.
 
@@ -50,6 +52,7 @@ End univTypes.
 
 (* Example of a datatype-generic function. *)
 Section dtgen.
+
   (* type definition needed for gmap *)
   Definition Map : vec Type 2 -> Type :=
     fun vs => vhd vs -> vhd (vtl vs).
@@ -93,6 +96,14 @@ Section dtgen.
   (* teither is a self defined type, definition in 'univ.v' *)
   Compute gmap teither _ bool (fun _ => false)
                        _ bool (fun _ => true) (inl tt). (* = inl false *)
+
+  (* A more general definition using record 'NGen' *)
+  Definition ggmap (n : nat) := (@nGen _)
+    Map
+    (fun n => n)
+    (fun tt => tt)
+    doSum
+    doProd.
 
 End dtgen.
 
@@ -243,6 +254,33 @@ Section aritydtgen.
     : kit k nMap (repeat (S n) (decodeClosed t)) :=
     specTerm t nmapConst.
 
+  (* A more general definition using record 'NGen' *)
+  Program Definition nggmap (n : nat) := (@nGen n)
+    nMap
+    _
+    _
+    _
+    _
+    .
+  Next Obligation.
+    (* Unit case *)
+    - induction n.
+      + apply tt.
+      + intros x. apply IHn. Defined.
+    Next Obligation.
+    (* Nat case *)
+      - induction n.
+        + apply 0.
+        + intros x. apply IHn. Defined.
+    Next Obligation.
+    (* Sum case *)
+      - pose proof @nmapConst n (F Ty (F Ty Ty)) Sum as pf.
+        apply pf. Defined.
+    Next Obligation.
+    (* Prod case *)
+      - pose proof @nmapConst n (F Ty (F Ty Ty)) Prod as pf.
+        apply pf. Defined.
+
   (* some test examples for unit map *)
   Compute ngmap 0 tunit. (* = () *)
   Compute ngmap 1 tunit tt. (* = () *)
@@ -290,3 +328,4 @@ Section aritydtgen.
     (inr 3) (inr 2). (* = inr 5 *)
 
 End aritydtgen.
+
