@@ -105,6 +105,8 @@ Section dtgen.
     doSum
     doProd.
 
+  Check ggmap 2.
+
 End dtgen.
 
 (* Example of a arity-generic and datatype-generic function. *)
@@ -119,16 +121,24 @@ Section aritydtgen.
     | @vcons _ (S n') x xs => x -> nMap xs
     end.
 
-  (* nat constant for nmapconst *)
-  Fixpoint cNat (n : nat) : kit Ty nMap (repeat (S n) _) :=
+  (* nat constant for nmapconst  *)
+  Fixpoint ccNat (n : nat)
+    : kit Ty nMap (repeat (S n) (decodeClosed (Con [] Nat))) :=
+    match n return kit Ty nMap (repeat (S n) (decodeClosed (Con [] Nat))) with
+    | O => O
+    | S O => fun x => x
+    | S m => fun x y => ccNat _
+    end.
+
+  Fixpoint cNat (n : nat) : kit Ty nMap (repeat (S n) (decodeClosed (Con [] Nat))) :=
     let f := (fix cNat' (n' : nat)
-      : kit Ty nMap (repeat (S n') nat) :=
-      match n' return kit Ty nMap (repeat (S n') nat) with
+      : kit Ty nMap (repeat (S n') (decodeClosed (Con [] Nat))) :=
+      match n' return kit Ty nMap (repeat (S n') (decodeClosed (Con [] Nat))) with
       | O => O
       | S O => fun x => x
       | S (S m) => fun x y => cNat' m
     end) in
-    match n return kit Ty nMap (repeat (S n) nat) with
+    match n return kit Ty nMap (repeat (S n) (decodeClosed (Con [] Nat))) with
     | O => O
     | S O => fun x => x
     | (S (S m)) =>
@@ -138,7 +148,8 @@ Section aritydtgen.
     end.
 
   (* unit constant for nmapconst *)
-  Fixpoint cUnit (n : nat) : kit Ty nMap (repeat (S n) _) :=
+  Fixpoint cUnit (n : nat)
+    : kit Ty nMap (repeat (S n) (decodeClosed (Con [] Unit))) :=
     match n with
     | O => tt
     | S n' => fun x => cUnit n'
@@ -206,7 +217,7 @@ Section aritydtgen.
   Fixpoint hProd (n : nat)
     : forall (va : vec Type (S n)), nMap va
     -> forall (vb : vec Type (S n)), nMap vb
-    -> nMap (zap (zap (repeat _ prod) va) vb).
+    -> nMap (zap (zap (repeat _ (decodeClosed (Con [] Prod))) va) vb).
       Proof.
         destruct n;
         intros VA a VB b;
@@ -215,36 +226,33 @@ Section aritydtgen.
         - apply pair.
           + rewrite pfa in a; apply a.
           + rewrite pfb in b; apply b.
-        - refine (fun pr => _). intros.
+        - simpl; intros pr.
           destruct pr as [pa pb].
           apply hProd.
           + rewrite pfa in a. apply a. apply pa.
           + rewrite pfb in b. apply b. apply pb.
       Defined.
 
+  Lemma nat_eq_closedNat : decodeClosed (Con [] Nat) = nat.
+  Proof.
+    unfold decodeClosed. reflexivity.
+  Defined.
+
   (* Combined cases for the generic constants *)
   Definition nmapConst {n : nat} : tyConstEnv (@nMap n).
   refine (fun k c => _).
   refine
   (match c with
-    | Nat => _
-    | Unit => _
+    | Nat => cNat _
+    | Unit => cUnit _
     | Prod => _
     | Sum => _
     end
   ).
-  (* CASE FOR NAT *)
-  - induction n.
-    + simpl. apply (cNat 0).
-    + refine (fun x => _). apply IHn.
-  (* CASE FOR UNIT *)
-  - induction n.
-    + apply tt.
-    + refine (fun x => _). apply IHn.
-  (* CASE FOR SUM *)
-  - apply (curryKind (F Ty (F Ty Ty))); simpl.
+  (* Case for sum *)
+  - apply (curryKind (F Ty (F Ty Ty))). simpl.
     apply hSum.
-  (* CASE FOR PROD *)
+  (* Case for prod *)
   - apply (curryKind (F Ty (F Ty Ty))); simpl.
     apply hProd.
   Defined.
@@ -262,24 +270,24 @@ Section aritydtgen.
     _
     _
     .
+  (* Unit case *)
   Next Obligation.
-    (* Unit case *)
     - induction n.
       + apply tt.
       + intros x. apply IHn. Defined.
-    Next Obligation.
-    (* Nat case *)
-      - induction n.
-        + apply 0.
-        + intros x. apply IHn. Defined.
-    Next Obligation.
-    (* Sum case *)
-      - pose proof @nmapConst n (F Ty (F Ty Ty)) Sum as pf.
-        apply pf. Defined.
-    Next Obligation.
-    (* Prod case *)
-      - pose proof @nmapConst n (F Ty (F Ty Ty)) Prod as pf.
-        apply pf. Defined.
+  (* Nat case *)
+  Next Obligation.
+    - induction n.
+      + apply 0.
+      + intros x. apply IHn. Defined.
+  (* Sum case *)
+  Next Obligation.
+    - pose proof @nmapConst n (F Ty (F Ty Ty)) Sum as pf.
+      apply pf. Defined.
+  (* Prod case *)
+  Next Obligation.
+    - pose proof @nmapConst n (F Ty (F Ty Ty)) Prod as pf.
+      apply pf. Defined.
 
   (* some test examples for unit map *)
   Compute ngmap 0 tunit. (* = () *)
