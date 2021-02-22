@@ -23,11 +23,11 @@ Section univTypes.
   (* examples of defining maybe and either with the universe. *)
 
   Definition tmaybe : ty (F Ty Ty) :=
-    Lam (App (App (tsumc _) (tunitc _)) (Var (Vz _ _))).
+    Lam (App (App tsumc tunitc) (Var (Vz _ _))).
 
   Definition teither : ty (F Ty (F Ty Ty)) :=
     Lam (Lam
-      (App (App (tsumc _)
+      (App (App tsumc
         (Var (Vs _ (Vz _ _)))) (Var (Vz _ _)))).
 
   (* Shorthands for decoding closed types *)
@@ -71,20 +71,21 @@ Section dtgen.
     fun f _ _ g sa => (f (fst sa), g (snd sa)).
 
   (** constants **)
-  Definition mapConst : tyConstEnv Map :=
+  Program Definition mapConst : tyConstEnv Map :=
     fun k c =>
       match c in const k
-      return kit k Map (repeat _ (decodeClosed (Con _ c)))
+      return kit k Map (repeat (decodeClosed (Con _ c)))
       with
       | Nat => fun n => n
       | Unit => fun _ => tt
-      | Prod => doProd
-      | Sum => doSum
+      | Prod => @doProd
+      | Sum => @doSum
       end.
 
+  Check specTerm.
   (* gmap *)
   Definition gmap (k : kind) (t : ty k) : kit k Map _ :=
-    specTerm t mapConst.
+    specTerm _ t (@mapConst).
 
   (* examples  of using gmap *)
   Compute gmap tprod nat nat (fun a => a + 1) bool bool (fun b => negb b) (1,true).
@@ -100,10 +101,8 @@ Section dtgen.
     Map
     (fun n => n)
     (fun tt => tt)
-    doSum
-    doProd.
-
-  Check ggmap 2.
+    (@doSum)
+    (@doProd).
 
 End dtgen.
 
@@ -121,22 +120,22 @@ Section aritydtgen.
 
   (* nat constant for nmapconst  *)
   Fixpoint ccNat (n : nat)
-    : kit Ty nMap (repeat (S n) (decodeClosed (Con [] Nat))) :=
-    match n return kit Ty nMap (repeat (S n) (decodeClosed (Con [] Nat))) with
+    : kit Ty nMap (repeat (n:=S n) (decodeClosed (Con [] Nat))) :=
+    match n return kit Ty nMap (repeat (n:=S n) (decodeClosed (Con [] Nat))) with
     | O => O
     | S O => fun x => x
     | S m => fun x y => ccNat _
     end.
 
-  Fixpoint cNat (n : nat) : kit Ty nMap (repeat (S n) (decodeClosed (Con [] Nat))) :=
+  Fixpoint cNat (n : nat) : kit Ty nMap (repeat (n:=S n) (decodeClosed (Con [] Nat))) :=
     let f := (fix cNat' (n' : nat)
-      : kit Ty nMap (repeat (S n') (decodeClosed (Con [] Nat))) :=
-      match n' return kit Ty nMap (repeat (S n') (decodeClosed (Con [] Nat))) with
+      : kit Ty nMap (repeat (n:=S n') (decodeClosed (Con [] Nat))) :=
+      match n' return kit Ty nMap (repeat (n:=S n') (decodeClosed (Con [] Nat))) with
       | O => O
       | S O => fun x => x
       | S (S m) => fun x y => cNat' m
     end) in
-    match n return kit Ty nMap (repeat (S n) (decodeClosed (Con [] Nat))) with
+    match n return kit Ty nMap (repeat (n:=S n) (decodeClosed (Con [] Nat))) with
     | O => O
     | S O => fun x => x
     | (S (S m)) =>
@@ -147,7 +146,7 @@ Section aritydtgen.
 
   (* unit constant for nmapconst *)
   Fixpoint cUnit (n : nat)
-    : kit Ty nMap (repeat (S n) (decodeClosed (Con [] Unit))) :=
+    : kit Ty nMap (repeat (n:=S n) (decodeClosed (Con [] Unit))) :=
     match n with
     | O => tt
     | S n' => fun x => cUnit n'
@@ -159,11 +158,11 @@ Section aritydtgen.
   (* helper for defining left-side cases of sums *)
   Fixpoint hSumLeft (n : nat)
     : forall (va : vec Type (S n)), nMap va ->
-    forall (vb : vec Type (S n)), nMap (zap (zap (repeat _ sum) va) vb).
+    forall (vb : vec Type (S n)), nMap (zap (zap (repeat sum) va) vb).
   Proof.
     intros VA a VB. simpl.
-    pose proof veq_hdtl VA as pfa;
-    pose proof veq_hdtl VB as pfb.
+    pose proof veq_hdtl (v:=VA) as pfa;
+    pose proof veq_hdtl (v:=VB) as pfb.
     destruct n as [| n'].
     - rewrite pfa in a. apply (inl a).
     - intros x. destruct x.
@@ -178,9 +177,9 @@ Section aritydtgen.
   (* helper for defining right-side cases of sums *)
   Fixpoint hSumRight (n : nat)
     : forall (va : vec Type (S n)) (vb : vec Type (S n)),
-    nMap vb -> nMap (zap (zap (repeat _ sum) va) vb).
+    nMap vb -> nMap (zap (zap (repeat sum) va) vb).
   Proof.
-    intros VA VB b. pose proof veq_hdtl VB as pfb.
+    intros VA VB b. pose proof veq_hdtl (v:=VB) as pfb.
     destruct n as [| n'].
     - rewrite pfb in b. apply (inr b).
     - intros x; destruct x as [left | right].
@@ -196,7 +195,7 @@ Section aritydtgen.
   Definition hSum (n : nat)
     : forall (va : vec Type (S n)), nMap va
     -> forall (vb : vec Type (S n)), nMap vb
-    -> nMap (zap (zap (repeat _ sum) va) vb).
+    -> nMap (zap (zap (repeat sum) va) vb).
   Proof.
     intros VA a VB b.
     destruct n as [| n'].
@@ -215,12 +214,12 @@ Section aritydtgen.
   Fixpoint hProd (n : nat)
     : forall (va : vec Type (S n)), nMap va
     -> forall (vb : vec Type (S n)), nMap vb
-    -> nMap (zap (zap (repeat _ (decodeClosed (Con [] Prod))) va) vb).
+    -> nMap (zap (zap (repeat (decodeClosed (Con [] Prod))) va) vb).
       Proof.
         destruct n;
         intros VA a VB b;
-        pose proof veq_hdtl VA as pfa;
-        pose proof veq_hdtl VB as pfb.
+        pose proof veq_hdtl (v:=VA) as pfa;
+        pose proof veq_hdtl (v:=VB) as pfb.
         - apply pair.
           + rewrite pfa in a; apply a.
           + rewrite pfb in b; apply b.
@@ -230,11 +229,6 @@ Section aritydtgen.
           + rewrite pfa in a. apply a. apply pa.
           + rewrite pfb in b. apply b. apply pb.
       Defined.
-
-  Lemma nat_eq_closedNat : decodeClosed (Con [] Nat) = nat.
-  Proof.
-    unfold decodeClosed. reflexivity.
-  Defined.
 
   (* Combined cases for the generic constants *)
   Definition nmapConst {n : nat} : tyConstEnv (@nMap n).
@@ -257,8 +251,8 @@ Section aritydtgen.
 
   (* doubly generic map *)
   Definition ngmap (n : nat) (k : kind) (t : ty k)
-    : kit k nMap (repeat (S n) (decodeClosed t)) :=
-    specTerm t nmapConst.
+    : kit k nMap (repeat (decodeClosed t)) :=
+    specTerm _ t (@nmapConst n).
 
   (* A more general definition using record 'NGen' *)
   Program Definition nggmap (n : nat) := (@nGen n)

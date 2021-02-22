@@ -43,7 +43,7 @@ Fixpoint unkit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
 (* Type for mapping constants to a value.
    Needed for the type signature of specTerm. *)
 Definition tyConstEnv (n : nat) (b : vec Type (S n) -> Type) : Type :=
-  forall (k:kind) (c:const k), kit k b (repeat _ (decodeClosed (Con _ c))).
+  forall (k:kind) (c:const k), kit k b (repeat (decodeClosed (Con _ c))).
 
 End types.
 
@@ -61,7 +61,7 @@ Section terms.
   Definition interpToVec (G : ctx) (k : kind) (n : nat)
     : typ G k -> vec (env G) n -> vec (decodeKind k) n :=
     fun t vs =>
-      zap (repeat _ (decodeType t)) vs.
+      zap (repeat (decodeType t)) vs.
 
   (* if two types are equal then kit t1 implies kit t2 *)
   Definition eqkit : forall (n : nat) (k : kind) (b : vec Type (S n) -> Type)
@@ -77,8 +77,8 @@ Section terms.
     {G : ctx} (ste : stenv b G)
     : vec (env G) (S n) :=
       match ste with
-      | nnil _ => repeat _ enil
-      | ncons a _ ste => zap (zap (repeat _ (@econs _ _)) a) (transpose ste)
+      | nnil => repeat enil
+      | ncons a _ ste => zap (zap (repeat (@econs _ _)) a) (transpose ste)
       end.
 
   (* currykinds for occasionally easier proos. *)
@@ -110,7 +110,7 @@ Section terms.
   (* six lemmas for typechecking different cases of generic types in specTerm  *)
 
   Lemma c6 : forall (n : nat) (A B : Type) (f : A -> B) (x : A),
-    zap (repeat n f) (repeat n x) = repeat n (f x).
+    zap (repeat (n:=n) f) (repeat x) = repeat (f x).
   Proof.
     intros n A B f x. induction n.
     - simpl. reflexivity.
@@ -119,7 +119,7 @@ Section terms.
 
   Lemma c5 : forall (n : nat) (k : kind) (G : ctx) (c : const k)
     (envs : vec (env G) n),
-      repeat n (decodeClosed (Con _ c)) = interpToVec (Con _ c) envs.
+      repeat (decodeClosed (Con _ c)) = interpToVec (Con _ c) envs.
   Proof.
     intros n k G c envs. induction envs.
     - simpl. destruct G.
@@ -148,7 +148,7 @@ Section terms.
 
   Lemma c3 : forall (n : nat) (k k' : kind) (G : ctx)
     (t : typ (cons k' G) k) (envs : vec (env G) n) (As : vec (decodeKind k') n),
-    interpToVec t (zap (zap (repeat n (@econs k' G)) As) envs)
+    interpToVec t (zap (zap (repeat (@econs k' G)) As) envs)
     = zap (interpToVec (Lam t) envs) As.
   Proof.
     intros. destruct n.
@@ -172,7 +172,7 @@ Section terms.
   Lemma c2 : forall (n : nat) (k k' : kind) (G : ctx)
     (x : tyvar G k') (t1 : vec (decodeKind k) n) (envs : vec (env G) n),
     interpToVec (Var x) envs
-    = interpToVec (Var (Vs _ x)) (zap (zap (repeat n (@econs _ _)) t1) envs).
+    = interpToVec (Var (Vs _ x)) (zap (zap (repeat (@econs _ _)) t1) envs).
   Proof.
     intros. induction envs.
     - simpl. destruct G.
@@ -185,7 +185,7 @@ Section terms.
 
   Lemma c1 : forall (n : nat) (k : kind) (G : ctx)
     (a : vec (decodeKind k) n) (envs : vec (env G) n),
-    a = interpToVec (Var (Vz _ _)) (zap (zap (repeat n (@econs _ _)) a) envs).
+    a = interpToVec (Var (Vz _ _)) (zap (zap (repeat (@econs _ _)) a) envs).
   Proof.
     intros. induction a.
     - simpl. reflexivity.
@@ -204,13 +204,14 @@ Section terms.
     - inversion v.
     - pattern v; apply tvcase; clear v; intros.
       + subst. apply eqkit with (t1:=a).
-        * pose proof (c1 _ a (transpose ste)) as ch. simpl in ch; simpl.
+        * pose proof (c1 _ (a:=a) (transpose ste)) as ch. simpl in ch; simpl.
           rewrite <- ch; reflexivity.
         * assumption.
       + pose proof (c2 _ x a (transpose ste)) as ch.
-        apply eqkit with (b:=b) in ch.
+        apply eqkit with (b0:=b) in ch.
         * apply ch.
-       * exact (nlookup _ _ _ _ x ste). Defined.
+        * apply nlookup.
+  Defined.
 
   (* term specialization with non-empty context *)
   Fixpoint specTerm' (n : nat) (b : vec Type (S n) -> Type)
@@ -234,14 +235,13 @@ Section terms.
         )
     | Con _ c => fun ve ce => eqkit _ _ (c5 c (transpose ve)) (ce _ c)
     end.
-   c6.
+
   (* term specialization in an empty context. *)
   Definition specTerm (n : nat) (b : vec Type (S n) -> Type) (k : kind) (t : ty k)
-  (ce : tyConstEnv b) : kit k b (repeat (S n) (decodeClosed t)) :=
-  eqkit k b (c6 _ _ _ ) (specTerm' t (nnil _) ce).
+  (ce : tyConstEnv b) : kit k b (repeat (decodeClosed t)) :=
+  eqkit k b (c6 _ _ ) (specTerm' t nnil ce).
 
 End terms.
-
 
 (* A Record interface for defining generic functions with the library.
     - transform is the form of the types for the base cases.
@@ -250,12 +250,12 @@ Record NGen (n : nat) : Type := nGen
   {
     transform : vec Type (S n) -> Type;
     cunit :
-      kit Ty transform (repeat (S n) (decodeClosed (Con [] Unit)));
+      kit Ty transform (repeat (decodeClosed (Con [] Unit)));
     cnat :
-      kit Ty transform (repeat (S n) (decodeClosed (Con [] Nat)));
+      kit Ty transform (repeat (decodeClosed (Con [] Nat)));
     csum :
-      kit (F Ty (F Ty Ty)) transform (repeat (S n) (decodeClosed (Con [] Sum)));
+      kit (F Ty (F Ty Ty)) transform (repeat (decodeClosed (Con [] Sum)));
     cprod :
-      kit (F Ty (F Ty Ty)) transform (repeat (S n) (decodeClosed (Con [] Prod)));
+      kit (F Ty (F Ty Ty)) transform (repeat (decodeClosed (Con [] Prod)));
   }.
 
