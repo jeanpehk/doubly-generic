@@ -1,9 +1,7 @@
-Set Implicit Arguments.
-Set Universe Polymorphism.
-
 From Coq Require Import Program List Datatypes.
 Import ListNotations.
 
+Require Export init.
 Require Import univ utils.
 
 (* Generic Library *)
@@ -236,7 +234,7 @@ Section terms.
         )
     | Con _ c => fun ve ce => eqkit _ _ (c5 c (transpose ve)) (ce _ c)
     end.
-
+   c6.
   (* term specialization in an empty context. *)
   Definition specTerm (n : nat) (b : vec Type (S n) -> Type) (k : kind) (t : ty k)
   (ce : tyConstEnv b) : kit k b (repeat (S n) (decodeClosed t)) :=

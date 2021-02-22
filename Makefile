@@ -3,8 +3,9 @@
 args = -impredicative-set
 
 all:
+	coqc $(args) init.v
 	coqc $(args) utils.v
-	coqc arity.v
+	coqc $(args) arity.v
 	coqc $(args) univ.v
 	coqc $(args) generic.v
 	coqc $(args) examples.v

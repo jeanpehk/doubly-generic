@@ -1,10 +1,8 @@
-Set Implicit Arguments.
-Set Universe Polymorphism.
-
 From Coq Require Import Program List.
 
 Import ListNotations.
 
+Require Export init.
 Require Import generic univ utils.
 
 (* examples of defining types with the universe. *)

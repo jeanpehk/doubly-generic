@@ -1,4 +1,4 @@
-Set Universe Polymorphism.
+Require Export init.
 
 (* A Simple arity-generic map ala Fridlender + Indrika / Weirich + Casinghino *)
 

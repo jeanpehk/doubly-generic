@@ -1,10 +1,8 @@
 From Coq Require Import List.
 
-Import EqNotations.
+Require Export init.
 
-Set Implicit Arguments.
-Set Universe Polymorphism.
-Set Asymmetric Patterns.
+Import EqNotations.
 
 (* Universe definition. *)
 
@@ -12,18 +10,25 @@ Inductive kind : Type :=
   | Ty : kind
   | F  : kind -> kind -> kind.
 
+Declare Scope gen_scope.
+
+Notation "'U'" := Ty : gen_scope.
+Notation "k '->' k'" := (F k k') : gen_scope.
+
+Open Scope gen_scope.
+
 Fixpoint decodeKind (k : kind) : Type :=
   match k with
-  | Ty => Type
-  | F k1 k2 => decodeKind k1 -> decodeKind k2
+  | U => Type
+  | k1 -> k2 => decodeKind k1 -> decodeKind k2
   end.
 
 (* Constants that are indexed by kinds. *)
 Inductive const : kind -> Type :=
   | Nat : const Ty
   | Unit : const Ty
-  | Sum : const (F Ty (F Ty Ty))
-  | Prod : const (F Ty (F Ty Ty)).
+  | Sum : const (U -> U -> U)
+  | Prod : const (U -> U -> U).
 
 Fixpoint decodeConst (k : kind) (c : const k) : decodeKind k :=
   match c in const k return decodeKind k with
