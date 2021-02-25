@@ -50,8 +50,8 @@ Section univTypes.
 
 End univTypes.
 
-(* Example of a datatype-generic function. *)
 Section dtgen.
+  (* Example of a datatype-generic map. *)
 
   (* type definition needed for gmap *)
   Definition Map : vec Type 2 -> Type :=
@@ -72,7 +72,6 @@ Section dtgen.
     : (A1 -> B1) -> forall (A2 B2 : Type), (A2 -> B2) -> (A1 * A2) -> (B1 * B2) :=
     fun f _ _ g sa => (f (fst sa), g (snd sa)).
 
-  (** constants **)
   Definition mapConst : tyConstEnv Map :=
     fun k c =>
       match c in const k
@@ -84,7 +83,6 @@ Section dtgen.
       | Sum => doSum
       end.
 
-  (* gmap *)
   Definition gmap (k : kind) (t : ty k) : kit k Map _ :=
     specTerm t mapConst.
 
@@ -105,26 +103,20 @@ Section dtgen.
     doSum
     doProd.
 
-  Check ggmap 2.
-
 End dtgen.
 
-(* Example of a arity-generic and datatype-generic function. *)
 Section aritydtgen.
+  (* Example of a arity-generic and datatype-generic function. *)
 
-  (* helpers for making doubly generic defs *)
+  (** Definitions for arity-generic datatype-generic map
+      - ngmap is partial so this version uses an error axiom.
+      - a version is included that uses sums later (optNgmap). **)
 
   (* type definition needed for doubly generic map *)
   Fixpoint nMap {n : nat} (v : vec Type (S n)) : Type :=
     match v with
     | @vcons _ O x xs => x
     | @vcons _ (S n') x xs => x -> nMap xs
-    end.
-
-  Fixpoint optNMap {n : nat} (v : vec Type (S n)) : Type :=
-    match v with
-    | @vcons _ O x xs => option x
-    | @vcons _ (S n') x xs => x -> option (optNMap xs)
     end.
 
   Fixpoint cNat (n : nat) : kit Ty nMap (repeat (S n) (decodeClosed (Con [] Nat))) :=
@@ -144,13 +136,150 @@ Section aritydtgen.
         else fun x => f (S m)
     end.
 
-  (* nat constant for nmapconst  *)
-  Fixpoint ccNat (n : nat)
-    : kit Ty nMap (repeat (S n) (decodeClosed (Con [] Nat))) :=
-    match n return kit Ty nMap (repeat (S n) (decodeClosed (Con [] Nat))) with
-    | O => O
-    | S O => fun x => x
-    | S m => fun x y => ccNat _
+  Fixpoint cUnit (n : nat)
+    : kit Ty nMap (repeat (S n) (decodeClosed (Con [] Unit))) :=
+    match n with
+    | O => tt
+    | S n' => fun x => cUnit n'
+    end.
+
+  (* Error axiom for finishing defs in sums *)
+  Axiom error : False.
+
+  (* helper for defining left-side cases of sums *)
+  Fixpoint cSumLeft (n : nat)
+    : forall (va : vec Type (S n)), nMap va ->
+    forall (vb : vec Type (S n)), nMap (zap (zap (repeat _ sum) va) vb).
+  Proof.
+    intros VA a VB. simpl.
+    pose proof veq_hdtl VA as pfa;
+    pose proof veq_hdtl VB as pfb.
+    destruct n as [| n'].
+    - rewrite pfa in a. simpl in a. apply (inl a).
+    - intros x. destruct x as [l | r].
+      + rewrite pfa in a; simpl in a.
+        apply cSumLeft.
+        pose proof a l as pa; apply pa.
+      + exfalso; apply error.
+  Defined.
+
+  (* helper for defining right-side cases of sums *)
+  Fixpoint cSumRight (n : nat)
+    : forall (va : vec Type (S n)) (vb : vec Type (S n)),
+    nMap vb -> nMap (zap (zap (repeat _ sum) va) vb).
+  Proof.
+    intros VA VB b. pose proof veq_hdtl VB as pfb.
+    destruct n as [| n'].
+    - rewrite pfb in b. apply (inr b).
+    - intros x; destruct x as [left | right].
+      (* error case *)
+      + exfalso; apply error.
+      + rewrite pfb in b. simpl in b.
+        pose proof b right as pb.
+        pose proof cSumRight n' (vtl VA)  (vtl VB) pb  as pf.
+        apply pf.
+  Defined.
+
+  (* case for sums in curried form  *)
+  Definition cSum (n : nat)
+    : forall (va : vec Type (S n)), nMap va
+    -> forall (vb : vec Type (S n)), nMap vb
+    -> nMap (zap (zap (repeat _ sum) va) vb).
+  Proof.
+    intros VA a VB b.
+    destruct n as [| n'].
+    (* no arguments, chooses arbitrary case inr *)
+    - simpl. rewrite veq_hdtl in b. simpl in b. apply (inr b).
+    - intros x; destruct x as [lr | rt].
+      + rewrite veq_hdtl in a. simpl in a.
+        pose proof a lr as pfa.
+        apply cSumLeft; apply pfa.
+      + rewrite veq_hdtl in b. simpl in b.
+        pose proof b rt as pfb.
+        apply cSumRight; apply pfb.
+   Defined.
+
+  (* case for prods in curried form  *)
+  Fixpoint cProd (n : nat)
+    : forall (va : vec Type (S n)), nMap va
+    -> forall (vb : vec Type (S n)), nMap vb
+    -> nMap (zap (zap (repeat _ (decodeClosed (Con [] Prod))) va) vb).
+      Proof.
+        destruct n;
+        intros VA a VB b;
+        pose proof veq_hdtl VA as pfa;
+        pose proof veq_hdtl VB as pfb.
+        - apply pair.
+          + rewrite pfa in a; apply a.
+          + rewrite pfb in b; apply b.
+        - simpl; intros pr.
+          destruct pr as [pa pb].
+          apply cProd.
+          + rewrite pfa in a. apply a. apply pa.
+          + rewrite pfb in b. apply b. apply pb.
+      Defined.
+
+  (* A simple tactic for prod and sum consts. *)
+  Ltac curryk const :=
+    apply (curryKind (F Ty (F Ty Ty))); simpl; apply const.
+
+  (* Combined cases for the generic constants *)
+  Definition nmapConst {n : nat} : tyConstEnv (@nMap n).
+  refine (fun k c => _).
+  refine
+  (match c with
+    | Nat => cNat _
+    | Unit => cUnit _
+    | Prod => _
+    | Sum => _
+    end
+  ).
+  (* Case for sum *)
+  Proof.
+    - curryk cSum.
+    - curryk cProd.
+  Defined.
+
+  (* doubly generic map *)
+  Definition ngmap (n : nat) (k : kind) (t : ty k)
+    : kit k nMap (repeat (S n) (decodeClosed t)) :=
+    specTerm t nmapConst.
+
+  (* A more general definition using record 'NGen' *)
+  Program Definition nggmap (n : nat) := (@nGen n)
+    nMap
+    _
+    _
+    _
+    _
+    .
+  (* Unit case *)
+  Next Obligation.
+    - induction n.
+      + apply tt.
+      + intros x. apply IHn. Defined.
+  (* Nat case *)
+  Next Obligation.
+    - induction n.
+      + apply 0.
+      + intros x. apply IHn. Defined.
+  (* Sum case *)
+  Next Obligation.
+    - pose proof @nmapConst n (F Ty (F Ty Ty)) Sum as pf.
+      apply pf. Defined.
+  (* Prod case *)
+  Next Obligation.
+    - pose proof @nmapConst n (F Ty (F Ty Ty)) Prod as pf.
+      apply pf. Defined.
+
+  (* Definitions for arity-generic datatype-generic map
+     - This version uses option instead of an axiom.
+     - Needs a lot of unnecessary sums *)
+
+  Fixpoint optNMap {n : nat} (v : vec Type (S n)) : Type :=
+    match v with
+    | @vcons _ O x xs => option x
+    | @vcons _ (S n') x xs => x -> option (optNMap xs)
     end.
 
   (* nat constant for nmapconst  *)
@@ -168,18 +297,11 @@ Section aritydtgen.
   Defined.
   Next Obligation.
     Proof.
-      induction n as [| n']; apply Some.
-      - apply Some; exact 0.
-      - intros y. apply IHn'.
+      revert X.
+      induction n as [| n' IHn']; intros x; apply Some.
+      - exact (Some x).
+      - intros y. apply IHn'; exact y.
     Defined.
-
-  (* unit constant for nmapconst *)
-  Fixpoint cUnit (n : nat)
-    : kit Ty nMap (repeat (S n) (decodeClosed (Con [] Unit))) :=
-    match n with
-    | O => tt
-    | S n' => fun x => cUnit n'
-    end.
 
   (* unit constant for nmapconst *)
   Fixpoint optUnit (n : nat)
@@ -190,27 +312,7 @@ Section aritydtgen.
     - intros x; apply Some. apply optUnit.
   Defined.
 
-  (* Error axiom for finishing defs in sums *)
-  Axiom error : False.
-
-  (* helper for defining left-side cases of sums *)
-  Fixpoint hSumLeft (n : nat)
-    : forall (va : vec Type (S n)), nMap va ->
-    forall (vb : vec Type (S n)), nMap (zap (zap (repeat _ sum) va) vb).
-  Proof.
-    intros VA a VB. simpl.
-    pose proof veq_hdtl VA as pfa;
-    pose proof veq_hdtl VB as pfb.
-    destruct n as [| n'].
-    - rewrite pfa in a. simpl in a.  apply (inl a).
-    - intros x. destruct x as [l | r].
-      + rewrite pfa in a; simpl in a.
-        apply hSumLeft.
-        pose proof a l as pa; apply pa.
-      + exfalso; apply error.
-  Defined.
-
-  Fixpoint optSumLeft (n : nat)
+ Fixpoint optSumLeft (n : nat)
     : forall (va : vec Type (S n)), optNMap va ->
     forall (vb : vec Type (S n)), optNMap (zap (zap (repeat _ sum) va) vb).
   Proof.
@@ -227,23 +329,6 @@ Section aritydtgen.
         * apply Some; apply optSumLeft; apply somepa.
         * apply None.
       + apply None.
-  Defined.
-
-  (* helper for defining right-side cases of sums *)
-  Fixpoint hSumRight (n : nat)
-    : forall (va : vec Type (S n)) (vb : vec Type (S n)),
-    nMap vb -> nMap (zap (zap (repeat _ sum) va) vb).
-  Proof.
-    intros VA VB b. pose proof veq_hdtl VB as pfb.
-    destruct n as [| n'].
-    - rewrite pfb in b. apply (inr b).
-    - intros x; destruct x as [left | right].
-      (* error case *)
-      + exfalso; apply error.
-      + rewrite pfb in b. simpl in b.
-        pose proof b right as pb.
-        pose proof hSumRight n' (vtl VA)  (vtl VB) pb  as pf.
-        apply pf.
   Defined.
 
   Fixpoint optSumRight (n : nat)
@@ -264,25 +349,6 @@ Section aritydtgen.
           apply optSumRight; apply somepb.
         * apply None.
   Defined.
-
-  (* case for sums in curried form  *)
-  Definition hSum (n : nat)
-    : forall (va : vec Type (S n)), nMap va
-    -> forall (vb : vec Type (S n)), nMap vb
-    -> nMap (zap (zap (repeat _ sum) va) vb).
-  Proof.
-    intros VA a VB b.
-    destruct n as [| n'].
-    (* no arguments, chooses arbitrary case inr *)
-    - simpl. rewrite veq_hdtl in b. simpl in b. apply (inr b).
-    - intros x; destruct x as [lr | rt].
-      + rewrite veq_hdtl in a. simpl in a.
-        pose proof a lr as pfa.
-        apply hSumLeft; apply pfa.
-      + rewrite veq_hdtl in b. simpl in b.
-        pose proof b rt as pfb.
-        apply hSumRight; apply pfb.
- Defined.
 
   Definition optSum (n : nat)
     : forall (va : vec Type (S n)), optNMap va
@@ -307,26 +373,6 @@ Section aritydtgen.
         * apply Some; apply optSumRight; apply somepfb.
         * apply None.
  Defined.
-
-  (* case for prods in curried form  *)
-  Fixpoint hProd (n : nat)
-    : forall (va : vec Type (S n)), nMap va
-    -> forall (vb : vec Type (S n)), nMap vb
-    -> nMap (zap (zap (repeat _ (decodeClosed (Con [] Prod))) va) vb).
-      Proof.
-        destruct n;
-        intros VA a VB b;
-        pose proof veq_hdtl VA as pfa;
-        pose proof veq_hdtl VB as pfb.
-        - apply pair.
-          + rewrite pfa in a; apply a.
-          + rewrite pfb in b; apply b.
-        - simpl; intros pr.
-          destruct pr as [pa pb].
-          apply hProd.
-          + rewrite pfa in a. apply a. apply pa.
-          + rewrite pfb in b. apply b. apply pb.
-      Defined.
 
   (* case for prods in curried form  *)
   Fixpoint optProd (n : nat)
@@ -358,25 +404,6 @@ Section aritydtgen.
           + apply None.
       Defined.
 
-  (* Combined cases for the generic constants *)
-  Definition nmapConst {n : nat} : tyConstEnv (@nMap n).
-  refine (fun k c => _).
-  refine
-  (match c with
-    | Nat => cNat _
-    | Unit => cUnit _
-    | Prod => _
-    | Sum => _
-    end
-  ).
-  (* Case for sum *)
-  - apply (curryKind (F Ty (F Ty Ty))). simpl.
-    apply hSum.
-  (* Case for prod *)
-  - apply (curryKind (F Ty (F Ty Ty))); simpl.
-    apply hProd.
-  Defined.
-
   Definition optNMapConst {n : nat} : tyConstEnv (@optNMap n).
   refine (fun k c => _).
   refine
@@ -388,138 +415,110 @@ Section aritydtgen.
     end
   ).
   (* Case for sum *)
-  - apply (curryKind (F Ty (F Ty Ty))). simpl.
-    apply optSum.
-  (* Case for prod *)
-  - apply (curryKind (F Ty (F Ty Ty))); simpl.
-    apply optProd.
+  - curryk optSum.
+  - curryk optProd.
   Defined.
-
-  (* doubly generic map *)
-  Definition ngmap (n : nat) (k : kind) (t : ty k)
-    : kit k nMap (repeat (S n) (decodeClosed t)) :=
-    specTerm t nmapConst.
 
   (* doubly generic map WITH OPTION *)
   Definition optNgmap (n : nat) (k : kind) (t : ty k)
     : kit k optNMap (repeat (S n) (decodeClosed t)) :=
     specTerm t optNMapConst.
 
-  (* A more general definition using record 'NGen' *)
-  Program Definition nggmap (n : nat) := (@nGen n)
-    nMap
-    _
-    _
-    _
-    _
-    .
-  (* Unit case *)
-  Next Obligation.
-    - induction n.
-      + apply tt.
-      + intros x. apply IHn. Defined.
-  (* Nat case *)
-  Next Obligation.
-    - induction n.
-      + apply 0.
-      + intros x. apply IHn. Defined.
-  (* Sum case *)
-  Next Obligation.
-    - pose proof @nmapConst n (F Ty (F Ty Ty)) Sum as pf.
-      apply pf. Defined.
-  (* Prod case *)
-  Next Obligation.
-    - pose proof @nmapConst n (F Ty (F Ty Ty)) Prod as pf.
-      apply pf. Defined.
+End aritydtgen.
 
-  (* some test examples for unit map *)
-  Compute ngmap 0 tunit. (* = () *)
-  Compute ngmap 1 tunit tt. (* = () *)
-  Compute ngmap 0 tnat. (* = 0 *)
+(* EXAMPLES *)
 
-  (* some test examples for nat map *)
-  Compute ngmap 1 tnat 1. (* = 1 *)
-  Compute ngmap 2 tnat 1 2. (* = 2 *)
-  Compute ngmap 3 tnat 1 2 3. (* = 3 *)
+(* - ngmap *)
 
-  (* some test examples for prod map *)
-  Compute ngmap 1 tprod
-    _ _ (fun x => x + 1)
-    _ _ (fun _ => true)
-    (1,false).
+(* some test examples for unit map *)
+Compute ngmap 0 tunit. (* = () *)
+Compute ngmap 1 tunit tt. (* = () *)
+Compute ngmap 0 tnat. (* = 0 *)
 
-  Compute optNgmap 1 tprod
-    _ _ (fun x => Some (Some (x + 1)))
-    _ _ (fun _ => Some (Some (true)))
-    (1,false).
+(* some test examples for nat map *)
+Compute ngmap 1 tnat 1. (* = 1 *)
+Compute ngmap 2 tnat 1 2. (* = 2 *)
+Compute ngmap 3 tnat 1 2 3. (* = 3 *)
 
-  Compute ngmap 2 tprod
-    nat nat nat (fun x y => x + y)
-    bool bool bool (fun x y => andb x y)
-    (15,true) (4, false).
+(* some test examples for prod map *)
+Compute ngmap 1 tprod
+  _ _ (fun x => x + 1)
+  _ _ (fun _ => true)
+  (1,false).
 
-  Compute ngmap 3 tprod
-    _ _ _ _ (fun x y z => x + y + z)
-    _ _ _ _ (fun x y z => andb (andb x y) z)
-    (11,true) (2, true) (6, true). (* = (19, true) *)
+Compute ngmap 2 tprod
+  nat nat nat (fun x y => x + y)
+  bool bool bool (fun x y => andb x y)
+  (15,true) (4, false).
 
-  Compute ngmap 3 tprod
-    _ _ _ _ (fun x y z => x + y + z)
-    _ _ _ _ (fun x y z => andb (andb x y) z)
-    (11,true) (2, true) (6, true). (* = (19, true) *)
+Compute ngmap 3 tprod
+  _ _ _ _ (fun x y z => x + y + z)
+  _ _ _ _ (fun x y z => andb (andb x y) z)
+  (11,true) (2, true) (6, true). (* = (19, true) *)
+
+Compute ngmap 3 tprod
+  _ _ _ _ (fun x y z => x + y + z)
+  _ _ _ _ (fun x y z => andb (andb x y) z)
+  (11,true) (2, true) (6, true). (* = (19, true) *)
 
 
-  (* some test examples for sum map *)
-  Compute ngmap 1 tsum
-    _ _ (fun x => x + 1)
-    _ _ (fun _ => true)
-    (inl 1). (* = inl 2 *)
-  Compute ngmap 2 tsum
-    _ _ _ (fun x y => x + y)
-    _ _ _ (fun x y => andb x y)
-    (inl 2) (inl 5). (* = inl 7 *)
-  Compute ngmap 3 tsum
-    _ _ _ _ (fun x y z => x + y + z)
-    _ _ _ _ (fun x y z => if andb x y then 0 else z)
-    (inr true) (inr false) (inr 4). (* = inr 4 *)
+(* some test examples for sum map *)
+Compute ngmap 1 tsum
+  _ _ (fun x => x + 1)
+  _ _ (fun _ => true)
+  (inl 1). (* = inl 2 *)
+Compute ngmap 2 tsum
+  _ _ _ (fun x y => x + y)
+  _ _ _ (fun x y => andb x y)
+  (inl 2) (inl 5). (* = inl 7 *)
+Compute ngmap 3 tsum
+  _ _ _ _ (fun x y z => x + y + z)
+  _ _ _ _ (fun x y z => if andb x y then 0 else z)
+  (inr true) (inr false) (inr 4). (* = inr 4 *)
 
-  (* some test examples for self defined tmaybe *)
-  Compute ngmap 1 tmaybe
-    _ _ (fun _ => false)
-    (inl tt). (* = inl () *)
-  Compute ngmap 2 tmaybe
-    _ _ _ (fun x => fun y => x + y)
-    (inr 3) (inr 2). (* = inr 5 *)
+(* some test examples for self defined tmaybe *)
+Compute ngmap 1 tmaybe
+  _ _ (fun _ => false)
+  (inl tt). (* = inl () *)
+Compute ngmap 2 tmaybe
+  _ _ _ (fun x => fun y => x + y)
+  (inr 3) (inr 2). (* = inr 5 *)
 
-  Compute optNgmap 1 tsum
-    _ _ (fun x => Some (Some (x + 1)))
-    _ _ (fun _ => Some (Some true))
-    (inl 1). (* = inl 2 *)
 
-  (* optNgmap aka ngmap with maybes examples. *)
+(* - optNgmap *)
 
-  (* ohh the beauty of it.. *)
-  Compute
-    (match optNgmap 2 tsum
-    _ _ _ (fun x => Some (fun x => Some (Some (x + 1))))
-    _ _ _ (fun _ => Some (fun _ => Some (Some false)))
-    (inl tt)
-    with
-    | Some x => x
-    | _ => _
-    end) (inl 1).
+(* optNgmap aka ngmap with maybes examples. *)
 
-  (* nmap is partial, this is err since arguments use
-     different constructors in a sum. *)
-  Compute
-    (match optNgmap 2 tsum
-    _ _ _ (fun x => Some (fun x => Some (Some (x + 1))))
-    _ _ _ (fun _ => Some (fun _ => Some (Some false)))
-    (inl tt)
-    with
-    | Some x => x
-    | _ => _
-    end) (inr false).
+Compute optNgmap 1 tprod
+  _ _ (fun x => Some (Some (x + 1)))
+  _ _ (fun _ => Some (Some (true)))
+  (1,false).
 
-  End aritydtgen.
+Compute optNgmap 1 tsum
+  _ _ (fun x => Some (Some (x + 1)))
+  _ _ (fun _ => Some (Some true))
+  (inl 1). (* = inl 2 *)
+
+(* ohh the beauty of it.. *)
+Compute
+  (match optNgmap 2 tsum
+  _ _ _ (fun x => Some (fun x => Some (Some (x + 1))))
+  _ _ _ (fun _ => Some (fun _ => Some (Some false)))
+  (inl tt)
+  with
+  | Some x => x
+  | _ => _
+  end) (inl 1).
+
+(* nmap is partial, this is err since arguments use
+   different constructors in a sum. *)
+Compute
+  (match optNgmap 2 tsum
+  _ _ _ (fun x => Some (fun x => Some (Some (x + 1))))
+  _ _ _ (fun _ => Some (fun _ => Some (Some false)))
+  (inl tt)
+  with
+  | Some x => x
+  | _ => _
+  end) (inr false).
 
