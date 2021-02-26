@@ -1,5 +1,6 @@
 Set Implicit Arguments.
 
+Require Export init.
 Require Import univ utils.
 
 (* A few example proofs with the universe. *)
