@@ -82,7 +82,7 @@ Section dtgen.
       end.
 
   Definition gmap (k : kind) (t : ty k) : kit k Map _ :=
-    specTerm _ t (@mapConst).
+    ngen _ t (@mapConst).
 
   (* examples  of using gmap *)
   Compute gmap tprod nat nat (fun a => a + 1) bool bool (fun b => negb b) (1,true).
@@ -117,6 +117,7 @@ Section aritydtgen.
     | @vcons _ (S n') x xs => x -> nMap xs
     end.
 
+  (* chose to return last given n for nat consts *)
   Fixpoint cNat (n : nat) : kit Ty nMap (repeat (n:=S n) (decodeClosed (Con [] Nat))) :=
     let f := (fix cNat' (n' : nat)
       : kit Ty nMap (repeat (n:=S n') (decodeClosed (Con [] Nat))) :=
@@ -217,58 +218,24 @@ Section aritydtgen.
           + rewrite pfb in b. apply b. apply pb.
       Defined.
 
-  (* A simple tactic for prod and sum consts. *)
+  (* A simple tactic to simplify prod and sum consts. *)
   Ltac curryk const :=
     apply (curryKind (F Ty (F Ty Ty))); simpl; apply const.
 
   (* Combined cases for the generic constants *)
-  Definition nmapConst {n : nat} : tyConstEnv (@nMap n).
-  refine (fun k c => _).
-  refine
-  (match c with
-    | Nat => cNat _
-    | Unit => cUnit _
-    | Prod => _
-    | Sum => _
-    end
-  ).
-  (* Case for sum *)
-  Proof.
-    - curryk (cSum (n:=n)).
-    - curryk (cProd (n:=n)).
-  Defined.
+  Definition nmapConst {n : nat} : tyConstEnv (@nMap n) :=
+    fun k c =>
+      match c with
+      | Nat => cNat _
+      | Unit => cUnit _
+      | Prod => ltac:(curryk (cProd (n:=n)))
+      | Sum => ltac:(curryk (cSum (n:=n)))
+      end.
 
   (* doubly generic map *)
   Definition ngmap (n : nat) (k : kind) (t : ty k)
     : kit k nMap (repeat (decodeClosed t)) :=
-    specTerm _ t (@nmapConst n).
-
-  (* A more general definition using record 'NGen' *)
-  Program Definition nggmap (n : nat) := (@nGen n)
-    nMap
-    _
-    _
-    _
-    _
-    .
-  (* Unit case *)
-  Next Obligation.
-    - induction n.
-      + apply tt.
-      + intros x. apply IHn. Defined.
-  (* Nat case *)
-  Next Obligation.
-    - induction n.
-      + apply 0.
-      + intros x. apply IHn. Defined.
-  (* Sum case *)
-  Next Obligation.
-    - pose proof @nmapConst n (F Ty (F Ty Ty)) Sum as pf.
-      apply pf. Defined.
-  (* Prod case *)
-  Next Obligation.
-    - pose proof @nmapConst n (F Ty (F Ty Ty)) Prod as pf.
-      apply pf. Defined.
+    ngen _ t (@nmapConst n).
 
   (* Definitions for arity-generic datatype-generic map
      - This version uses option instead of an axiom.
@@ -276,7 +243,7 @@ Section aritydtgen.
 
   Fixpoint optNMap {n : nat} (v : vec Type (S n)) : Type :=
     match v with
-    | @vcons _ O x xs => option x
+    | @vcons _ O x xs => x
     | @vcons _ (S n') x xs => x -> option (optNMap xs)
     end.
 
@@ -291,13 +258,13 @@ Section aritydtgen.
     end eq_refl.
   Next Obligation.
     Proof.
-      apply Some; exact 0.
-  Defined.
+      exact 0.
+    Defined.
   Next Obligation.
     Proof.
       revert X.
       induction n as [| n' IHn']; intros x; apply Some.
-      - exact (Some x).
+      - exact x.
       - intros y. apply IHn'; exact y.
     Defined.
 
@@ -306,7 +273,7 @@ Section aritydtgen.
     : kit (n:=n) Ty optNMap (repeat (decodeClosed (Con [] Unit))).
   Proof.
     destruct n as [| n'].
-    - simpl; apply Some. exact tt.
+    - simpl; exact tt.
     - intros x; apply Some. apply optUnit.
   Defined.
 
@@ -316,16 +283,17 @@ Section aritydtgen.
   Proof.
     intros VA a VB. simpl.
     pose proof @veq_hdtl _ _ VA as pfa.
-    pose proof @veq_hdtl _ _ VB as pfb.
     destruct n as [| n'].
-    - rewrite pfa in a. simpl in a. destruct a as [somea |].
-      * apply (Some (inl somea)).
-      * apply None.
-    - intros x. destruct x as [l | r].
+    - rewrite pfa in a. simpl in a. apply (inl a).
+    - intros x; destruct x as [xl | xr].
+      (* case for left side *)
       + rewrite pfa in a; simpl in a.
-        pose proof a l as pa. destruct pa as [somepa |].
-        * apply Some; apply optSumLeft; apply somepa.
+        apply a in xl; destruct xl as [somex |].
+        (* case for some *)
+        * apply Some; apply optSumLeft; apply somex.
+        (* case for none *)
         * apply None.
+      (* case for right side *)
       + apply None.
   Defined.
 
@@ -333,18 +301,19 @@ Section aritydtgen.
     : forall (va : vec Type (S n)) (vb : vec Type (S n)),
     optNMap vb -> optNMap (zap (zap (repeat sum) va) vb).
   Proof.
-    intros VA VB b. pose proof @veq_hdtl _ _ VB as pfb.
+    intros VA VB b. simpl.
+    pose proof @veq_hdtl _ _ VB as pfb.
     destruct n as [| n'].
-    - rewrite pfb in b; simpl in b. destruct b as [someb |].
-      + simpl; apply Some; apply (inr someb).
+    - rewrite pfb in b; simpl in b. apply (inr b).
+    - intros x; destruct x as [xl | xr].
+      (* case for left side *)
       + apply None.
-    - intros x; destruct x as [left | right].
-      + apply None.
+      (* case for right side *)
       + rewrite pfb in b; simpl in b.
-        pose proof b right as pb.
-        destruct pb as [somepb |].
-        * apply Some.
-          apply optSumRight; apply somepb.
+        apply b in xr. destruct xr as [somex |].
+        (* case for some *)
+        * apply Some; apply optSumRight; apply somex.
+        (* case for none *)
         * apply None.
   Defined.
 
@@ -356,71 +325,65 @@ Section aritydtgen.
     intros VA a VB b.
     destruct n as [| n'].
     (* no arguments, chooses arbitrary case inr *)
-    - simpl. rewrite veq_hdtl in b. simpl in b. destruct b as [someb |].
-      + apply Some; apply (inr someb).
-      + apply None.
-    - intros x; destruct x as [lr | rt].
+    - simpl. rewrite veq_hdtl in b. simpl in b. apply (inr b).
+    - intros x; destruct x as [lx | rx].
       + rewrite veq_hdtl in a; simpl in a.
-        pose proof a lr as pfa.
-        destruct pfa as [somepfa |].
-        * apply Some; apply optSumLeft; apply somepfa.
+        apply a in lx. destruct lx as [somex |].
+        (* case for some *)
+        * apply Some; apply optSumLeft; apply somex.
+        (* case for none *)
         * apply None.
       + rewrite veq_hdtl in b; simpl in b.
-        pose proof b rt as pfb.
-        destruct pfb as [somepfb |].
-        * apply Some; apply optSumRight; apply somepfb.
+        apply b in rx; destruct rx as [somex |].
+        (* case for some *)
+        * apply Some; apply optSumRight; apply somex.
+        (* case for none *)
         * apply None.
- Defined.
+  Defined.
 
   (* case for prods in curried form  *)
   Fixpoint optProd (n : nat)
     : forall (va : vec Type (S n)), optNMap va
     -> forall (vb : vec Type (S n)), optNMap vb
     -> optNMap (zap (zap (repeat (decodeClosed (Con [] Prod))) va) vb).
-      Proof.
-        destruct n;
-        intros VA a VB b;
-        pose proof @veq_hdtl _ _ VA as pfa;
-        pose proof @veq_hdtl _ _ VB as pfb.
-        - rewrite pfa in a; simpl in a. destruct a as [somea |];
-          rewrite pfb in b; simpl in b. destruct b as [someb |].
-          + apply Some; apply pair.
-            * apply somea.
-            * apply someb.
-          + apply None.
-          + apply None.
-        - rewrite pfa in a; simpl in a.
-          rewrite pfb in b; simpl in b.
-          intros pr. destruct pr as [pa pb].
-          apply a in pa; apply b in pb.
-          destruct pa as [somea |].
-          + destruct pb as [someb |].
-            * apply Some; apply optProd.
-              { apply somea. }
-              { apply someb. }
-            * apply None.
-          + apply None.
-      Defined.
-
-  Definition optNMapConst {n : nat} : tyConstEnv (@optNMap n).
-  refine (fun k c => _).
-  refine
-  (match c with
-    | Nat => optNat _
-    | Unit => optUnit _
-    | Prod => _
-    | Sum => _
-    end
-  ).
-  (* Case for sum *)
-  - curryk (optSum (n:=n)).
-  - curryk (optProd (n:=n)).
+  Proof.
+    destruct n;
+    intros VA a VB b;
+    pose proof @veq_hdtl _ _ VA as pfa;
+    pose proof @veq_hdtl _ _ VB as pfb.
+    - rewrite pfa in a; simpl in a.
+      rewrite pfb in b; simpl in b.
+      apply pair.
+      (* inl case *)
+      + apply a.
+      (* inr case *)
+      + apply b.
+    - rewrite pfa in a; simpl in a.
+      rewrite pfb in b; simpl in b.
+      intros pr. destruct pr as [pa pb].
+      apply a in pa. apply b in pb.
+      destruct pa as [somea |].
+      + destruct pb as [someb |].
+        * apply Some; apply optProd.
+          { apply somea. }
+          { apply someb. }
+        * apply None.
+      + apply None.
   Defined.
+
+  Definition optNMapConst {n : nat} : tyConstEnv (@optNMap n) :=
+    fun k c =>
+      match c with
+      | Nat => optNat _
+      | Unit => optUnit _
+      | Prod => ltac:(curryk (optProd (n:=n)))
+      | Sum => ltac:(curryk (optSum (n:=n)))
+      end.
 
   (* doubly generic map WITH OPTION *)
   Definition optNgmap (n : nat) (k : kind) (t : ty k)
     : kit (n:=n) k optNMap (repeat (decodeClosed t)) :=
-    specTerm _ t (@optNMapConst _).
+    ngen _ t (@optNMapConst _).
 
 End aritydtgen.
 
@@ -465,10 +428,12 @@ Compute ngmap 1 tsum
   _ _ (fun x => x + 1)
   _ _ (fun _ => true)
   (inl 1). (* = inl 2 *)
+
 Compute ngmap 2 tsum
   _ _ _ (fun x y => x + y)
   _ _ _ (fun x y => andb x y)
   (inl 2) (inl 5). (* = inl 7 *)
+
 Compute ngmap 3 tsum
   _ _ _ _ (fun x y z => x + y + z)
   _ _ _ _ (fun x y z => if andb x y then 0 else z)
@@ -478,6 +443,7 @@ Compute ngmap 3 tsum
 Compute ngmap 1 tmaybe
   _ _ (fun _ => false)
   (inl tt). (* = inl () *)
+
 Compute ngmap 2 tmaybe
   _ _ _ (fun x y => x + y)
   (inr 3) (inr 2). (* = inr 5 *)
@@ -487,32 +453,32 @@ Compute ngmap 2 tmaybe
 (* optNgmap aka ngmap with maybes examples. *)
 
 Compute optNgmap 1 tprod
-  _ _ (fun x => Some (Some (x + 1)))
-  _ _ (fun _ => Some (Some (true)))
-  (1,false). (* = Some (Some (2, true)) *)
+  _ _ (fun x => (Some (x + 1)))
+  _ _ (fun _ => (Some true))
+  (1,false). (* = Some (2, true) *)
 
 Compute optNgmap 1 tsum
-  _ _ (fun x => Some (Some (x + 1)))
-  _ _ (fun _ => Some (Some true))
-  (inl 1). (* = Some (Some (inl 2)) *)
+  _ _ (fun x => (Some (x + 1)))
+  _ _ (fun _ => (Some true))
+  (inl 1). (* = Some (inl 2) *)
 
 (* ohh the beauty of it.. *)
 Compute
   (match optNgmap 2 tsum
-  _ _ _ (fun x => Some (fun y => Some (Some (y + 1))))
-  _ _ _ (fun _ => Some (fun _ => Some (Some false)))
+  _ _ _ (fun x => Some (fun y => (Some (y + 1))))
+  _ _ _ (fun _ => Some (fun _ => (Some false)))
   (inl tt)
   with
   | Some x => x
   | _ => _
-  end) (inl 1). (* = Some (Some (inl 2)) *)
+  end) (inl 1). (* = Some (inl 2) *)
 
 (* nmap is partial, this is err since arguments use
    different constructors in a sum. *)
 Compute
   (match optNgmap 2 tsum
-  _ _ _ (fun x => Some (fun x => Some (Some (x + 1))))
-  _ _ _ (fun _ => Some (fun _ => Some (Some false)))
+  _ _ _ (fun x => Some (fun x => Some (x + 1)))
+  _ _ _ (fun _ => Some (fun _ => Some false))
   (inl tt)
   with
   | Some x => x

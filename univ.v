@@ -45,7 +45,6 @@ Inductive tyvar : ctx -> kind -> Type :=
    needed for proof of 'nlookup' in generic.v *)
 Lemma tvcase :
   forall G k k' (P : tyvar (k' :: G) k -> Type),
-  (*(forall (pf : k=k'), P (eq_vs (Vz G k) pf)) ->*)
   (forall (pf : k=k'), P (rew [fun x:kind => tyvar (x :: G) k] pf in Vz G k)) ->
   (forall x, P (Vs _ x)) ->
   forall x, P x.

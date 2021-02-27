@@ -35,15 +35,15 @@ Fixpoint unkit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
     match k return vec (decodeKind k) (S n) -> Type with
     | Ty => fun vs => b vs
     | F k1 k2 => fun vs =>
-        forall (a : vec (decodeKind k1) _),
+        forall a,
         kit k1 b a ->
         unkit k2 b (zap vs a)
     end.
 
 (* Type for mapping constants to a value.
-   Needed for the type signature of specTerm. *)
+   Needed for the type signature of ngen. *)
 Definition tyConstEnv (n : nat) (b : vec Type (S n) -> Type) : Type :=
-  forall (k:kind) (c:const k), kit k b (repeat (decodeClosed (Con _ c))).
+  forall k c, kit k b (repeat (decodeClosed (Con _ c))).
 
 End types.
 
@@ -107,7 +107,7 @@ Section terms.
     intros A n t1 t2 x eq. rewrite eq. reflexivity.
   Defined.
 
-  (* six lemmas for typechecking different cases of generic types in specTerm  *)
+  (* six lemmas for typechecking different cases of generic types in ngen  *)
 
   Lemma c6 : forall (n : nat) (A B : Type) (f : A -> B) (x : A),
     zap (repeat (n:=n) f) (repeat x) = repeat (f x).
@@ -213,42 +213,43 @@ Section terms.
         * apply nlookup.
   Defined.
 
+  Hint Resolve eqkit transpose c6 : core.
+
   (* term specialization with non-empty context *)
-  Fixpoint specTerm' (n : nat) (b : vec Type (S n) -> Type)
+  (* - pretty unreadable.. ways to better automate or simplify logic? *)
+  Fixpoint ngen' (n : nat) (b : vec Type (S n) -> Type)
     (G : ctx) (k : kind) (t : typ G k)
     : forall (ve : stenv b G) (ce : tyConstEnv b),
     kit k b (interpToVec t (transpose ve)) :=
     match t in typ G k
-    return forall (ve : stenv b G) (ce : tyConstEnv b),
+    return forall ve ce,
     kit k b (interpToVec t (transpose ve)) with
     | Var x => fun ve ce => nlookup x ve
-    | @Lam _ k1 k2 t1 => fun ve ce =>
-        curry _ (fun (a : vec (decodeKind k1) (S n)) (nwt : kit k1 b a) =>
-                  eqkit _ _ (c3 t1 (transpose ve) a)
-                  (specTerm' t1 (ncons a nwt ve) ce))
-    | @App _ k1 k2 t1 t2 => fun ve ce =>
-        eqkit _ _ (c4 t1 t2 (transpose ve))
-        (@uncurry' (S n) (decodeKind k1) (fun a => (forall _: kit k1 b a,
-                       (kit k2 b (zap (interpToVec t1 (transpose ve)) a))))
-        (@specTerm' _ _ _ (F k1 k2) t1 ve ce)
-        (interpToVec t2 (transpose ve)) (specTerm' t2 ve ce)
-        )
-    | Con _ c => fun ve ce => eqkit _ _ (c5 c (transpose ve)) (ce _ c)
+    | Lam t1 => fun ve ce =>
+        curry _ (fun a nwt =>
+                  eqkit _ _ (c3 t1 ltac:(auto) a)
+                  (ngen' t1 (ncons a nwt ve) ce))
+    | @App _ _ k2 t1 t2 => fun ve ce =>
+        eqkit _ _ (c4 t1 t2 ltac:(auto))
+        (uncurry' (fun a => (forall _,
+                       (kit k2 b (zap (interpToVec t1 ltac:(auto)) a))))
+        (ngen' t1 ve ce)
+        (interpToVec t2 ltac:(auto)) (ngen' t2 ve ce))
+    | Con _ c => fun ve ce => eqkit _ _ (c5 c ltac:(auto)) (ce _ c)
     end.
 
   (* term specialization in an empty context. *)
-  Definition specTerm (n : nat) (b : vec Type (S n) -> Type) (k : kind) (t : ty k)
+  Definition ngen (n : nat) (b : vec Type (S n) -> Type) (k : kind) (t : ty k)
   (ce : tyConstEnv b) : kit k b (repeat (decodeClosed t)) :=
-  eqkit k b (c6 _ _ ) (specTerm' t nnil ce).
+  eqkit _ _ ltac:(auto) (ngen' _ nnil ce).
 
 End terms.
 
 (* A Record interface for defining generic functions with the library.
     - transform is the form of the types for the base cases.
     - rest are cases for defining behaviour for the base cases.        *)
-Record NGen (n : nat) : Type := nGen
+  Record NGen (n : nat) (transform : vec Type (S n) -> Type) : Type := nGen
   {
-    transform : vec Type (S n) -> Type;
     cunit :
       kit Ty transform (repeat (decodeClosed (Con [] Unit)));
     cnat :
