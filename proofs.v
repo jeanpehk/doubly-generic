@@ -1,5 +1,6 @@
 Require Export init.
-Require Import univ examples.
+Require Import Program.
+Require Import univ utils examples.
 
 (* simple proofs about self-defined generic types *)
 
@@ -38,3 +39,25 @@ Proof.
   - reflexivity.
 Qed.
 
+(** Map = nMap 2 **)
+
+Lemma nmap2 (v : vec Type 2)
+  : nMap v = (vhd v -> vhd (vtl v)).
+Proof.
+  unfold nMap.
+  (* dep destruct uses axiom JMeq_eq *)
+  dependent destruction v.
+  dependent destruction v.
+  reflexivity.
+Qed.
+
+Theorem map_eq_nmap2 (v : vec Type 2)
+  : Map v = nMap v.
+Proof.
+  unfold Map.
+  dependent destruction v;
+  dependent destruction v.
+  reflexivity.
+Qed.
+
+Print Assumptions map_eq_nmap2.

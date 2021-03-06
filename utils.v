@@ -74,6 +74,13 @@ Proof.
   - intros. simpl. reflexivity.
 Defined.
 
+Definition veq_add {A : Type} {n : nat} (v1 v2 : vec A n) (a : A) :
+  v1 = v2 -> vcons a v1 = vcons a v2.
+Proof.
+  intros eq.
+  rewrite eq; reflexivity.
+Defined.
+
 Lemma vec_cons_case {A : Type} {n : nat} (v : vec A (S n)) :
   {x : A & {u : vec A n | v = vcons x u}}.
 Proof.
@@ -90,13 +97,6 @@ Proof.
   - hnf in f.
     pose proof vec_cons_case (v := va) as H. destruct H as [a [As H]].
     rewrite H. exact (uncurry' _ _ _ (f a) As). Defined.
-
-(* uncurry a vector *)
-Fixpoint uncurryV (A B : Type) (n : nat) : nary_fn n A B -> vec A n -> B :=
-  match n return nary_fn n A B -> vec A n -> B with
-  | O => fun x _ => x
-  | S n' => fun f t => uncurryV (f (vhd t)) (vtl t)
-  end.
 
 (* apply a vector of functions to a vector *)
 Fixpoint zap (A B : Type) (n : nat) (vf : vec (A -> B) n)

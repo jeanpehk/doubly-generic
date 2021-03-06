@@ -1,6 +1,7 @@
 From Coq Require Import Program List.
 
 Import ListNotations.
+Import EqNotations.
 
 Require Export init.
 Require Import generic univ utils.
@@ -129,7 +130,7 @@ Section aritydtgen.
     match n return kit Ty nMap (repeat (n:=S n) (decodeClosed (Con [] Nat))) with
     | O => O
     | S O => fun x => x
-    | (S (S m)) =>
+    | S (S m) =>
         if Nat.odd m
         then fun x y => cNat m
         else fun x => f (S m)
@@ -175,7 +176,7 @@ Section aritydtgen.
       + exfalso; apply error.
       + rewrite pfb in b. simpl in b.
         pose proof b right as pb.
-        pose proof cSumRight n' (vtl VA)  (vtl VB) pb  as pf.
+        pose proof cSumRight n' (vtl VA) (vtl VB) pb as pf.
         apply pf.
   Defined.
 
@@ -187,7 +188,7 @@ Section aritydtgen.
   Proof.
     intros VA a VB b.
     destruct n as [| n'].
-    (* no arguments, chooses arbitrary case inr *)
+    (* chooses arbitrary case inr *)
     - simpl. rewrite veq_hdtl in b. simpl in b. apply (inr b).
     - intros x; destruct x as [lr | rt].
       + rewrite veq_hdtl in a. simpl in a.
@@ -223,7 +224,7 @@ Section aritydtgen.
     apply (curryKind (F Ty (F Ty Ty))); simpl; apply const.
 
   (* Combined cases for the generic constants *)
-  Definition nmapConst {n : nat} : tyConstEnv (@nMap n) :=
+  Program Definition nmapConst {n : nat} : tyConstEnv (@nMap n) :=
     fun k c =>
       match c with
       | Nat => cNat _

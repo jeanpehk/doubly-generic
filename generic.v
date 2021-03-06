@@ -12,8 +12,8 @@ Require Import univ utils.
     Which itself is largely based on the generic library by Verbruggen et al.:
     - https://dl.acm.org/doi/pdf/10.1145/1411318.1411326 *)
 
-(* Main differences in the usage of universepolymorfism
-   and the curiosities of Coq with regards to getting the definitions
+(* Main differences are in the usage of universepolymorfism
+   and in the curiosities of Coq with regards to getting the definitions
    to actually typecheck. *)
 
 (****** Type level definitions ******)
@@ -81,7 +81,7 @@ Section terms.
       | ncons a _ ste => zap (zap (repeat (@econs _ _)) a) (transpose ste)
       end.
 
-  (* currykinds for occasionally easier proos. *)
+  (* currykinds for occasionally easier proofs. *)
   Program Fixpoint curryKind (k : kind) (n : nat) (b : vec Type (S n) -> Type)
     : forall v : vec (decodeKind k) (S n),
     unkit k b v -> kit k b v :=
@@ -100,13 +100,6 @@ Section terms.
   (* PROOFS to help with term specialization,
      type signatures from definitions by Weirich + Casinghino. *)
 
-  (* helper *)
-  Lemma eqtail : forall {A} (n : nat) (t1 t2 : vec A n) (x : A),
-    t1 = t2 -> vcons x t1 = vcons x t2.
-  Proof.
-    intros A n t1 t2 x eq. rewrite eq. reflexivity.
-  Defined.
-
   (* six lemmas for typechecking different cases of generic types in ngen  *)
 
   Lemma c6 : forall (n : nat) (A B : Type) (f : A -> B) (x : A),
@@ -117,7 +110,7 @@ Section terms.
     - simpl. rewrite IHn. reflexivity.
   Defined.
 
-  Lemma c5 : forall (n : nat) (k : kind) (G : ctx) (c : const k)
+  Lemma caseCon : forall (n : nat) (k : kind) (G : ctx) (c : const k)
     (envs : vec (env G) n),
       repeat (decodeClosed (Con _ c)) = interpToVec (Con _ c) envs.
   Proof.
@@ -130,7 +123,7 @@ Section terms.
       + simpl. reflexivity.
   Defined.
 
-  Lemma c4 : forall (n : nat) (k1 k2 : kind) (G : ctx)
+  Lemma caseApp : forall (n : nat) (k1 k2 : kind) (G : ctx)
     (t1 : typ G (F k1 k2))
     (t2 : typ G k1)
     (envs : vec (env G) n),
@@ -142,11 +135,11 @@ Section terms.
       + simpl. reflexivity.
       + simpl. reflexivity.
     -  destruct a.
-      + simpl. apply eqtail. unfold interpToVec in IHenvs. apply IHenvs.
-      + simpl. apply eqtail. unfold interpToVec in IHenvs. apply IHenvs.
+      + simpl. apply veq_add. apply IHenvs.
+      + simpl. apply veq_add. apply IHenvs.
   Defined.
 
-  Lemma c3 : forall (n : nat) (k k' : kind) (G : ctx)
+  Lemma caseLam : forall (n : nat) (k k' : kind) (G : ctx)
     (t : typ (cons k' G) k) (envs : vec (env G) n) (As : vec (decodeKind k') n),
     interpToVec t (zap (zap (repeat (@econs k' G)) As) envs)
     = zap (interpToVec (Lam t) envs) As.
@@ -157,19 +150,19 @@ Section terms.
         * simpl. reflexivity.
         * simpl. reflexivity.
       + destruct G.
-        * apply eqtail. simpl in IHv. apply IHv with (envs := v). reflexivity.
-        * apply eqtail. simpl. simpl in IHv. apply IHv with (envs := v).
+        * apply veq_add. simpl in IHv. apply IHv with (envs := v). reflexivity.
+        * apply veq_add. simpl. simpl in IHv. apply IHv with (envs := v).
           reflexivity.
     - induction envs.
       + simpl. destruct G.
         * simpl. reflexivity.
         * simpl. reflexivity.
       + destruct G.
-        * apply eqtail. apply IHenvs.
-        * apply eqtail. apply IHenvs.
+        * apply veq_add. apply IHenvs.
+        * apply veq_add. apply IHenvs.
   Defined.
 
-  Lemma c2 : forall (n : nat) (k k' : kind) (G : ctx)
+  Lemma caseVar : forall (n : nat) (k k' : kind) (G : ctx)
     (x : tyvar G k') (t1 : vec (decodeKind k) n) (envs : vec (env G) n),
     interpToVec (Var x) envs
     = interpToVec (Var (Vs _ x)) (zap (zap (repeat (@econs _ _)) t1) envs).
@@ -179,17 +172,17 @@ Section terms.
       + simpl. reflexivity.
       + simpl. reflexivity.
     - simpl. destruct G.
-      + apply eqtail. apply IHenvs.
-      + apply eqtail. apply IHenvs.
+      + apply veq_add. apply IHenvs.
+      + apply veq_add. apply IHenvs.
   Defined.
 
-  Lemma c1 : forall (n : nat) (k : kind) (G : ctx)
+  Lemma caseVz : forall (n : nat) (k : kind) (G : ctx)
     (a : vec (decodeKind k) n) (envs : vec (env G) n),
     a = interpToVec (Var (Vz _ _)) (zap (zap (repeat (@econs _ _)) a) envs).
   Proof.
     intros. induction a.
     - simpl. reflexivity.
-    - apply eqtail. apply IHa.
+    - apply veq_add. apply IHa.
   Defined.
 
   (** Lookup a type for var from stenv.
@@ -204,10 +197,10 @@ Section terms.
     - inversion v.
     - pattern v; apply tvcase; clear v; intros.
       + subst. apply eqkit with (t1:=a).
-        * pose proof (c1 _ (a:=a) (transpose ste)) as ch. simpl in ch; simpl.
+        * pose proof (caseVz _ (a:=a) (transpose ste)) as ch. simpl in ch; simpl.
           rewrite <- ch; reflexivity.
         * assumption.
-      + pose proof (c2 _ x a (transpose ste)) as ch.
+      + pose proof (caseVar _ x a (transpose ste)) as ch.
         apply eqkit with (b0:=b) in ch.
         * apply ch.
         * apply nlookup.
@@ -225,17 +218,16 @@ Section terms.
     return forall ve ce,
     kit k b (interpToVec t (transpose ve)) with
     | Var x => fun ve ce => nlookup x ve
-    | Lam t1 => fun ve ce =>
-        curry _ (fun a nwt =>
-                  eqkit _ _ (c3 t1 ltac:(auto) a)
+    | Lam t1 => fun ve ce => curry _ (fun a nwt =>
+                  eqkit _ _ (caseLam t1 ltac:(auto) a)
                   (ngen' t1 (ncons a nwt ve) ce))
     | @App _ _ k2 t1 t2 => fun ve ce =>
-        eqkit _ _ (c4 t1 t2 ltac:(auto))
+        eqkit _ _ (caseApp t1 t2 ltac:(auto))
         (uncurry' (fun a => (forall _,
                        (kit k2 b (zap (interpToVec t1 ltac:(auto)) a))))
         (ngen' t1 ve ce)
         (interpToVec t2 ltac:(auto)) (ngen' t2 ve ce))
-    | Con _ c => fun ve ce => eqkit _ _ (c5 c ltac:(auto)) (ce _ c)
+    | Con _ c => fun ve ce => eqkit _ _ (caseCon c ltac:(auto)) (ce _ c)
     end.
 
   (* term specialization in an empty context. *)
@@ -248,8 +240,9 @@ End terms.
 (* A Record interface for defining generic functions with the library.
     - transform is the form of the types for the base cases.
     - rest are cases for defining behaviour for the base cases.        *)
-  Record NGen (n : nat) (transform : vec Type (S n) -> Type) : Type := nGen
+  Record NGen (n : nat) : Type := nGen
   {
+    transform : vec Type (S n) -> Type;
     cunit :
       kit Ty transform (repeat (decodeClosed (Con [] Unit)));
     cnat :
