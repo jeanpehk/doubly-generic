@@ -82,8 +82,15 @@ Section dtgen.
       | Sum => @doSum
       end.
 
-  Definition gmap (k : kind) (t : ty k) : kit k Map _ :=
-    ngen _ t (@mapConst).
+  Program Definition mConst : NGen Map :=
+    nGen
+    (fun tt => tt)
+    (fun n => n)
+    (@doSum)
+    (@doProd).
+
+  Definition gmap (k : kind) (t : ty k) : kit k Map (repeat (decodeClosed t)) :=
+    ngen _ mConst.
 
   (* examples  of using gmap *)
   Compute gmap tprod nat nat (fun a => a + 1) bool bool (fun b => negb b) (1,true).
@@ -93,14 +100,6 @@ Section dtgen.
   (* teither is a self defined type, definition in 'univ.v' *)
   Compute gmap teither _ bool (fun _ => false)
                        _ bool (fun _ => true) (inl tt). (* = inl false *)
-
-  (* A more general definition using record 'NGen' *)
-  Definition ggmap (n : nat) := (@nGen _)
-    Map
-    (fun n => n)
-    (fun tt => tt)
-    (@doSum)
-    (@doProd).
 
 End dtgen.
 
@@ -233,10 +232,17 @@ Section aritydtgen.
       | Sum => ltac:(curryk (cSum (n:=n)))
       end.
 
+  Definition nConst (n : nat) : NGen nMap (n:=n) :=
+    nGen
+    (cUnit _)
+    (cNat _)
+    (ltac:(curryk (cSum (n:=n))))
+    (ltac:(curryk (cProd (n:=n)))).
+
   (* doubly generic map *)
   Definition ngmap (n : nat) (k : kind) (t : ty k)
     : kit k nMap (repeat (decodeClosed t)) :=
-    ngen _ t (@nmapConst n).
+    ngen _ nConst (n:=n).
 
   (* Definitions for arity-generic datatype-generic map
      - This version uses option instead of an axiom.
@@ -381,10 +387,17 @@ Section aritydtgen.
       | Sum => ltac:(curryk (optSum (n:=n)))
       end.
 
+  Definition optNConst {n : nat} : NGen optNMap (n:=n) :=
+    nGen
+    (optUnit _)
+    (optNat _)
+    (ltac:(curryk (optSum (n:=n))))
+    (ltac:(curryk (optProd (n:=n)))).
+
   (* doubly generic map WITH OPTION *)
   Definition optNgmap (n : nat) (k : kind) (t : ty k)
     : kit (n:=n) k optNMap (repeat (decodeClosed t)) :=
-    ngen _ t (@optNMapConst _).
+    ngen _ optNConst (n:=n).
 
 End aritydtgen.
 

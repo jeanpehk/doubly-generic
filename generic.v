@@ -208,11 +208,26 @@ Section terms.
 
   Hint Resolve eqkit transpose c6 : core.
 
+(* A Record interface for defining generic functions with the library.
+    - transform is the form of the types for the base cases.
+    - rest are cases for defining behaviour for the base cases.        *)
+  Record NGen (n : nat) (transform : vec Type (S n) -> Type) : Type := nGen
+  {
+    cunit :
+      kit Ty transform (repeat (decodeClosed (Con [] Unit)));
+    cnat :
+      kit Ty transform (repeat (decodeClosed (Con [] Nat)));
+    csum :
+      kit (F Ty (F Ty Ty)) transform (repeat (decodeClosed (Con [] Sum)));
+    cprod :
+      kit (F Ty (F Ty Ty)) transform (repeat (decodeClosed (Con [] Prod)));
+  }.
+
   (* term specialization with non-empty context *)
   (* - pretty unreadable.. ways to better automate or simplify logic? *)
-  Fixpoint ngen' (n : nat) (b : vec Type (S n) -> Type)
+  Program Fixpoint ngen' (n : nat) (b : vec Type (S n) -> Type)
     (G : ctx) (k : kind) (t : typ G k)
-    : forall (ve : stenv b G) (ce : tyConstEnv b),
+    : forall (ve : stenv b G) (ce : NGen b),
     kit k b (interpToVec t (transpose ve)) :=
     match t in typ G k
     return forall ve ce,
@@ -227,29 +242,22 @@ Section terms.
                        (kit k2 b (zap (interpToVec t1 ltac:(auto)) a))))
         (ngen' t1 ve ce)
         (interpToVec t2 ltac:(auto)) (ngen' t2 ve ce))
-    | Con _ c => fun ve ce => eqkit _ _ (caseCon c ltac:(auto)) (ce _ c)
+    | Con _ c => fun ve ce => _
     end.
+  Next Obligation.
+    pose proof caseCon c (transpose ve) as pc.
+    pose proof eqkit _ b pc as pf.
+    destruct ce;
+    destruct c;
+    rewrite <- pc;
+    assumption.
+  Defined.
 
   (* term specialization in an empty context. *)
   Definition ngen (n : nat) (b : vec Type (S n) -> Type) (k : kind) (t : ty k)
-  (ce : tyConstEnv b) : kit k b (repeat (decodeClosed t)) :=
+  (ce : NGen b) : kit k b (repeat (decodeClosed t)) :=
   eqkit _ _ ltac:(auto) (ngen' _ nnil ce).
 
 End terms.
 
-(* A Record interface for defining generic functions with the library.
-    - transform is the form of the types for the base cases.
-    - rest are cases for defining behaviour for the base cases.        *)
-  Record NGen (n : nat) : Type := nGen
-  {
-    transform : vec Type (S n) -> Type;
-    cunit :
-      kit Ty transform (repeat (decodeClosed (Con [] Unit)));
-    cnat :
-      kit Ty transform (repeat (decodeClosed (Con [] Nat)));
-    csum :
-      kit (F Ty (F Ty Ty)) transform (repeat (decodeClosed (Con [] Sum)));
-    cprod :
-      kit (F Ty (F Ty Ty)) transform (repeat (decodeClosed (Con [] Prod)));
-  }.
 
