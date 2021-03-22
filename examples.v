@@ -10,30 +10,30 @@ Require Import generic univ utils.
 Section univTypes.
 
   (* Shorthands for constants *)
-  Definition tnat := Con nil Nat.
-  Definition tunit := Con nil Unit.
-  Definition tsum := Con nil Sum.
-  Definition tprod := Con nil Prod.
+  Definition tnat := Con (G:=nil) Nat.
+  Definition tunit := Con (G:=nil) Unit.
+  Definition tsum := Con (G:=nil) Sum.
+  Definition tprod := Con (G:=nil) Prod.
 
   (* Shorthands for constants in a context *)
-  Definition tnatc := fun ctx => Con ctx Nat.
-  Definition tunitc := fun ctx => Con ctx Unit.
-  Definition tsumc := fun ctx => Con ctx Sum.
-  Definition tprodc := fun ctx => Con ctx Prod.
+  Definition tnatc := fun c:ctx => Con (G:=c) Nat.
+  Definition tunitc := fun c:ctx => Con (G:=c) Unit.
+  Definition tsumc := fun c:ctx => Con (G:=c) Sum.
+  Definition tprodc := fun c:ctx => Con (G:=c) Prod.
 
   (* examples of defining maybe and either with the universe. *)
 
   Definition tmaybe : ty (F Ty Ty) :=
-    Lam (App (App tsumc tunitc) (Var (Vz _ _))).
+    Lam (App (App tsumc tunitc) (Var (Vz ))).
 
   Definition teither : ty (F Ty (F Ty Ty)) :=
     Lam (Lam
       (App (App tsumc
-        (Var (Vs _ (Vz _ _)))) (Var (Vz _ _)))).
+        (Var (Vs (Vz )))) (Var (Vz )))).
 
   (* Shorthands for decoding closed types *)
-  Definition deNat := decodeClosed (Con _ Nat).
-  Definition deUnit := decodeClosed (Con _ Unit).
+  Definition deNat := decodeClosed (Con Nat).
+  Definition deUnit := decodeClosed (Con Unit).
   Definition deMaybe (A : Set) := decodeClosed tmaybe A.
   Definition deEither (A B : Set) := decodeClosed teither A B.
 
@@ -45,7 +45,7 @@ Section univTypes.
   Compute deEither. (* = fun A B : Set => (A + B) *)
   Compute deEither nat unit. (* = (nat + unit) *)
 
-  Compute decodeClosed (Con _ Nat).
+  Compute decodeClosed (Con Nat).
 
 End univTypes.
 
@@ -74,7 +74,7 @@ Section dtgen.
   Definition mapConst : tyConstEnv Map :=
     fun k c =>
       match c in const k
-      return kit k Map (repeat (decodeClosed (Con _ c)))
+      return kit k Map (repeat (decodeClosed (Con c)))
       with
       | Nat => fun n => n
       | Unit => fun _ => tt
@@ -118,15 +118,15 @@ Section aritydtgen.
     end.
 
   (* chose to return last given n for nat consts *)
-  Fixpoint cNat (n : nat) : kit Ty nMap (repeat (n:=S n) (decodeClosed (Con [] Nat))) :=
+  Fixpoint cNat (n : nat) : kit Ty nMap (repeat (n:=S n) (decodeClosed (Con Nat))) :=
     let f := (fix cNat' (n' : nat)
-      : kit Ty nMap (repeat (n:=S n') (decodeClosed (Con [] Nat))) :=
-      match n' return kit Ty nMap (repeat (n:=S n') (decodeClosed (Con [] Nat))) with
+      : kit Ty nMap (repeat (n:=S n') (decodeClosed (Con Nat))) :=
+      match n' return kit Ty nMap (repeat (n:=S n') (decodeClosed (Con Nat))) with
       | O => O
       | S O => fun x => x
       | S (S m) => fun x y => cNat' m
     end) in
-    match n return kit Ty nMap (repeat (n:=S n) (decodeClosed (Con [] Nat))) with
+    match n return kit Ty nMap (repeat (n:=S n) (decodeClosed (Con Nat))) with
     | O => O
     | S O => fun x => x
     | S (S m) =>
@@ -136,7 +136,7 @@ Section aritydtgen.
     end.
 
   Fixpoint cUnit (n : nat)
-    : kit Ty nMap (repeat (n:=S n) (decodeClosed (Con [] Unit))) :=
+    : kit Ty nMap (repeat (n:=S n) (decodeClosed (Con Unit))) :=
     match n with
     | O => tt
     | S n' => fun x => cUnit n'
@@ -202,7 +202,7 @@ Section aritydtgen.
   Fixpoint cProd (n : nat)
     : forall (va : vec Type (S n)), nMap va
     -> forall (vb : vec Type (S n)), nMap vb
-    -> nMap (zap (zap (repeat (decodeClosed (Con [] Prod))) va) vb).
+    -> nMap (zap (zap (repeat (decodeClosed (Con Prod))) va) vb).
       Proof.
         destruct n;
         intros VA a VB b;
@@ -256,10 +256,10 @@ Section aritydtgen.
 
   (* nat constant for nmapconst  *)
   Program Fixpoint optNat (n : nat)
-    : kit Ty optNMap (repeat (decodeClosed (Con [] Nat))) :=
+    : kit Ty optNMap (repeat (decodeClosed (Con Nat))) :=
     match n as n'
     return forall (pf : n=n'),
-    kit Ty optNMap (repeat (n:=S n') (decodeClosed (Con [] Nat))) with
+    kit Ty optNMap (repeat (n:=S n') (decodeClosed (Con Nat))) with
     | O => _
     | S n => _
     end eq_refl.
@@ -277,7 +277,7 @@ Section aritydtgen.
 
   (* unit constant for nmapconst *)
   Fixpoint optUnit (n : nat)
-    : kit (n:=n) Ty optNMap (repeat (decodeClosed (Con [] Unit))).
+    : kit (n:=n) Ty optNMap (repeat (decodeClosed (Con Unit))).
   Proof.
     destruct n as [| n'].
     - simpl; exact tt.
@@ -352,7 +352,7 @@ Section aritydtgen.
   Fixpoint optProd (n : nat)
     : forall (va : vec Type (S n)), optNMap va
     -> forall (vb : vec Type (S n)), optNMap vb
-    -> optNMap (zap (zap (repeat (decodeClosed (Con [] Prod))) va) vb).
+    -> optNMap (zap (zap (repeat (decodeClosed (Con Prod))) va) vb).
   Proof.
     destruct n;
     intros VA a VB b;

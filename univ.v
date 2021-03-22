@@ -1,10 +1,8 @@
 From Coq Require Import List.
 
-Import EqNotations.
+Require Export init.
 
-Set Implicit Arguments.
-Set Universe Polymorphism.
-Set Asymmetric Patterns.
+Import EqNotations.
 
 (* Universe definition. *)
 
@@ -45,8 +43,8 @@ Inductive tyvar : ctx -> kind -> Type :=
    needed for proof of 'nlookup' in generic.v *)
 Lemma tvcase :
   forall G k k' (P : tyvar (k' :: G) k -> Type),
-  (forall (pf : k=k'), P (rew [fun x:kind => tyvar (x :: G) k] pf in Vz G k)) ->
-  (forall x, P (Vs _ x)) ->
+  (forall (pf : k=k'), P (rew [fun x:kind => tyvar (x :: G) k] pf in Vz)) ->
+  (forall x, P (Vs x)) ->
   forall x, P x.
   Proof.
     intros.
@@ -59,8 +57,8 @@ Lemma tvcase :
     x' = x
     -> P x
     with
-    | Vz _ _ => _
-    | Vs _ _ _ _ => _
+    | Vz => _
+    | Vs _ => _
     end eq_refl eq_refl eq_refl eq_refl).
     - intros. subst. apply X.
     - intros. subst. simpl. apply (X0 t).
@@ -84,28 +82,28 @@ Inductive env : list kind -> Type :=
 
 Definition envtl (k : kind) (G : ctx) (en : env (k :: G)) : env G :=
   match en with
-  | econs _ _ _ G' => G'
+  | econs _ G' => G'
   end.
 
 (* lookup a type from env *)
 Fixpoint slookup (k : kind) (G : ctx) (tv : tyvar G k) : env G -> decodeKind k :=
   match tv in tyvar G k return env G -> decodeKind k with
-  | Vz _ _ => fun env =>
+  | Vz => fun env =>
                  match env in env G with
-                 | econs _ _ v G => v
+                 | econs v G => v
                  end
-  | Vs _ _ _ x => fun env => slookup x (envtl env)
+  | Vs x => fun env => slookup x (envtl env)
   end.
 
 Fixpoint decodeType (k : kind) (G : ctx) (t : typ G k) : env G -> decodeKind k := 
   match t in typ G k return env G -> decodeKind k with
-  | Var _ _ x => fun e =>
+  | Var x => fun e =>
                    slookup x e
-  | Lam _ _ _ t1 => fun e =>
-                      fun y => decodeType t1 (econs _ y e)
-  | App _ _ _ t1 t2 => fun e =>
+  | Lam t1 => fun e =>
+                      fun y => decodeType t1 (econs y e)
+  | App t1 t2 => fun e =>
                          (decodeType t1 e) (decodeType t2 e)
-  | Con _ _ c => fun e =>
+  | Con c => fun e =>
                    decodeConst c
   end.
 

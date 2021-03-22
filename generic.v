@@ -43,7 +43,7 @@ Fixpoint unkit (n : nat) (k : kind) (b : vec Type (S n) -> Type)
 (* Type for mapping constants to a value.
    Needed for the type signature of ngen. *)
 Definition tyConstEnv (n : nat) (b : vec Type (S n) -> Type) : Type :=
-  forall k c, kit k b (repeat (decodeClosed (Con _ c))).
+  forall k c, kit k b (repeat (decodeClosed (Con c))).
 
 End types.
 
@@ -112,7 +112,7 @@ Section terms.
 
   Lemma caseCon : forall (n : nat) (k : kind) (G : ctx) (c : const k)
     (envs : vec (env G) n),
-      repeat (decodeClosed (Con _ c)) = interpToVec (Con _ c) envs.
+      repeat (decodeClosed (Con c)) = interpToVec (Con c) envs.
   Proof.
     intros n k G c envs. induction envs; simpl; destruct G;
     (* base case for induction *)
@@ -163,7 +163,7 @@ Section terms.
   Lemma caseVs : forall (n : nat) (k k' : kind) (G : ctx)
     (x : tyvar G k') (t1 : vec (decodeKind k) n) (envs : vec (env G) n),
     interpToVec (Var x) envs
-    = interpToVec (Var (Vs _ x)) (zap (zap (repeat (@econs _ _)) t1) envs).
+    = interpToVec (Var (Vs x)) (zap (zap (repeat (@econs _ _)) t1) envs).
   Proof.
     intros. induction envs.
     - simpl. destruct G.
@@ -176,7 +176,7 @@ Section terms.
 
   Lemma caseVz : forall (n : nat) (k : kind) (G : ctx)
     (a : vec (decodeKind k) n) (envs : vec (env G) n),
-    a = interpToVec (Var (Vz _ _)) (zap (zap (repeat (@econs _ _)) a) envs).
+    a = interpToVec (Var (Vz )) (zap (zap (repeat (@econs _ _)) a) envs).
   Proof.
     intros. induction a.
     - simpl. reflexivity.
@@ -212,18 +212,18 @@ Section terms.
   Record NGen (n : nat) (transform : vec Type (S n) -> Type) : Type := nGen
   {
     cunit :
-      kit Ty transform (repeat (decodeClosed (Con [] Unit)));
+      kit Ty transform (repeat (decodeClosed (Con Unit)));
     cnat :
-      kit Ty transform (repeat (decodeClosed (Con [] Nat)));
+      kit Ty transform (repeat (decodeClosed (Con Nat)));
     csum :
-      kit (F Ty (F Ty Ty)) transform (repeat (decodeClosed (Con [] Sum)));
+      kit (F Ty (F Ty Ty)) transform (repeat (decodeClosed (Con Sum)));
     cprod :
-      kit (F Ty (F Ty Ty)) transform (repeat (decodeClosed (Con [] Prod)));
+      kit (F Ty (F Ty Ty)) transform (repeat (decodeClosed (Con Prod)));
   }.
 
   Definition ngenConst (n : nat) (k : kind) (G : ctx) (b : vec Type (S n) -> Type)
     (c : const k) (ve : stenv b G) (ce : NGen b)
-    : kit k b (interpToVec (Con G c) (transpose ve)).
+    : kit k b (interpToVec (Con c) (transpose ve)).
   Proof.
     pose proof caseCon c (transpose ve) as pc.
     pose proof eqkit _ b pc as pf.
@@ -249,7 +249,7 @@ Section terms.
                        (kit k2 b (zap (interpToVec t1 ltac:(auto)) a))))
         (ngen' t1 ve ce)
         (interpToVec t2 ltac:(auto)) (ngen' t2 ve ce))
-    | Con _ c => fun ve ce => ngenConst c ve ce
+    | Con c => fun ve ce => ngenConst c ve ce
     end.
 
   (* term specialization in an empty context. *)
@@ -258,5 +258,4 @@ Section terms.
   eqkit _ _ ltac:(auto) (ngen' _ nnil ce).
 
 End terms.
-
 

@@ -11,4 +11,4 @@ all:
 	coqc $(args) proofs.v
 
 clean:
-	rm *.vok *.glob *.vo *.vos
+	rm *.vok *.glob *.vo *.vos *.aux
