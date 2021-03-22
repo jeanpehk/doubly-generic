@@ -1,6 +1,8 @@
-# Doubly-generic programming in Coq.
+# Doubly-generic
 
 A small library for arity-generic datatype-generic, or doubly-generic, programming in Coq.
+
+# Background
 
 Most of this is ideas combined from these papers:
 
