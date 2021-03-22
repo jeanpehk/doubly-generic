@@ -2,7 +2,7 @@
 
 A small library for arity-generic datatype-generic, or doubly-generic, programming in Coq.
 
-# Background
+## Background
 
 Most of this is ideas combined from these papers:
 
