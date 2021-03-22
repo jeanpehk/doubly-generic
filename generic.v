@@ -114,13 +114,11 @@ Section terms.
     (envs : vec (env G) n),
       repeat (decodeClosed (Con _ c)) = interpToVec (Con _ c) envs.
   Proof.
-    intros n k G c envs. induction envs.
-    - simpl. destruct G.
-      + simpl. reflexivity.
-      + simpl. reflexivity.
-    - simpl. rewrite IHenvs. destruct G.
-      + simpl. reflexivity.
-      + simpl. reflexivity.
+    intros n k G c envs. induction envs; simpl; destruct G;
+    (* base case for induction *)
+    try reflexivity;
+    (* inductive cases *)
+    rewrite IHenvs; reflexivity.
   Defined.
 
   Lemma caseApp : forall (n : nat) (k1 k2 : kind) (G : ctx)
@@ -162,7 +160,7 @@ Section terms.
         * apply veq_add. apply IHenvs.
   Defined.
 
-  Lemma caseVar : forall (n : nat) (k k' : kind) (G : ctx)
+  Lemma caseVs : forall (n : nat) (k k' : kind) (G : ctx)
     (x : tyvar G k') (t1 : vec (decodeKind k) n) (envs : vec (env G) n),
     interpToVec (Var x) envs
     = interpToVec (Var (Vs _ x)) (zap (zap (repeat (@econs _ _)) t1) envs).
@@ -200,7 +198,7 @@ Section terms.
         * pose proof (caseVz _ (a:=a) (transpose ste)) as ch. simpl in ch; simpl.
           rewrite <- ch; reflexivity.
         * assumption.
-      + pose proof (caseVar _ x a (transpose ste)) as ch.
+      + pose proof (caseVs _ x a (transpose ste)) as ch.
         apply eqkit with (b0:=b) in ch.
         * apply ch.
         * apply nlookup.
@@ -223,9 +221,18 @@ Section terms.
       kit (F Ty (F Ty Ty)) transform (repeat (decodeClosed (Con [] Prod)));
   }.
 
+  Definition ngenConst (n : nat) (k : kind) (G : ctx) (b : vec Type (S n) -> Type)
+    (c : const k) (ve : stenv b G) (ce : NGen b)
+    : kit k b (interpToVec (Con G c) (transpose ve)).
+  Proof.
+    pose proof caseCon c (transpose ve) as pc.
+    pose proof eqkit _ b pc as pf.
+    destruct ce; destruct c; rewrite <- pc; assumption.
+  Defined.
+
   (* term specialization with non-empty context *)
   (* - pretty unreadable.. ways to better automate or simplify logic? *)
-  Program Fixpoint ngen' (n : nat) (b : vec Type (S n) -> Type)
+  Fixpoint ngen' (n : nat) (b : vec Type (S n) -> Type)
     (G : ctx) (k : kind) (t : typ G k)
     : forall (ve : stenv b G) (ce : NGen b),
     kit k b (interpToVec t (transpose ve)) :=
@@ -242,16 +249,8 @@ Section terms.
                        (kit k2 b (zap (interpToVec t1 ltac:(auto)) a))))
         (ngen' t1 ve ce)
         (interpToVec t2 ltac:(auto)) (ngen' t2 ve ce))
-    | Con _ c => fun ve ce => _
+    | Con _ c => fun ve ce => ngenConst c ve ce
     end.
-  Next Obligation.
-    pose proof caseCon c (transpose ve) as pc.
-    pose proof eqkit _ b pc as pf.
-    destruct ce;
-    destruct c;
-    rewrite <- pc;
-    assumption.
-  Defined.
 
   (* term specialization in an empty context. *)
   Definition ngen (n : nat) (b : vec Type (S n) -> Type) (k : kind) (t : ty k)
