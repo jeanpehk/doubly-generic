@@ -42,10 +42,6 @@ $ make clean
 
 ## Structure
 
-### arity.v
-
-Simple arity-generic map ala Fridlender + Indrika / Weirich + Casinghino.
-
 ### univ.v
 
 A universe for doubly generic programming + interpretation functions.
