@@ -4,7 +4,7 @@ A small library for arity-generic datatype-generic, or doubly-generic, programmi
 
 ## Example
 
-Usage of doubly-generic map with the library,
+Usage of a doubly-generic map with the library:
 
 ```coq
 Compute ngmap 3 tprod
