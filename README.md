@@ -16,7 +16,7 @@ Compute ngmap 3 tprod
   = (19, true)
 ```
 
-Example generic definitions in [gmap.v](gmap.v), [ngmap.v](ngmap) and
+Example generic definitions in [gmap.v](gmap.v), [ngmap.v](ngmap.v) and
 [optngmap.v](optngmap.v), more examples of their usage in [examples.v](examples.v)
 
 ## Background
