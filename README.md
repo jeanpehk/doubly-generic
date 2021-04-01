@@ -17,7 +17,7 @@ Compute ngmap 3 tprod
 ```
 
 Example generic definitions in [gmap.v](gmap.v), [ngmap.v](ngmap.v) and
-[optngmap.v](optngmap.v), more examples of their usage in [examples.v](examples.v)
+[optngmap.v](optngmap.v). More examples of their usage in [examples.v](examples.v)
 
 ## Background
 
