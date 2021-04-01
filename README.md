@@ -31,7 +31,7 @@ Arity-Generic Datatype-Generic Programming (Weirich, Casinghino):
 Polytypic Programming in Coq (Verbruggen, de Vries, Hughes):
 - https://dl.acm.org/doi/pdf/10.1145/1411318.1411326
 - Does not consider arity-genericity.
-- Kind-indexed universe (like with W + C) -> could be extended to be doubly generic.
+- Kind-indexed universe (like with W + C) -> could be extended to be doubly-generic.
 - Uses Coq.
 
 Main outcome of this library:
@@ -71,7 +71,7 @@ A doubly-generic library.
 
 A few examples of using the library and it's generic types.
 
-## proofs.v
+### proofs.v
 
 A few proofs of the library.
 
