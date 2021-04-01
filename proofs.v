@@ -1,6 +1,6 @@
 Require Export init.
 Require Import Program.
-Require Import univ utils examples.
+Require Import univ utils examples ngmap gmap.
 
 (* simple proofs about self-defined generic types *)
 

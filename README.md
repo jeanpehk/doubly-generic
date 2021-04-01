@@ -2,6 +2,22 @@
 
 A small library for arity-generic datatype-generic, or doubly-generic, programming in Coq.
 
+## Example
+
+Usage of doubly-generic map with the library,
+
+```coq
+Compute ngmap 3 tprod
+  _ _ _ _ (fun x y z => x + y + z)
+  _ _ _ _ (fun x y z => andb (andb x y) z)
+  (11,true) (2, true) (6, true).
+
+  (* = (19, true) *)
+```
+
+Example generic definitions in [gmap.v](gmap.v), [ngmap.v](ngmap) and
+[optngmap.v](optngmap.v), more examples of their usage in [examples.v](examples.v)
+
 ## Background
 
 Most of this is ideas combined from these papers:
@@ -50,16 +66,11 @@ A universe for doubly generic programming + interpretation functions.
 
 A doubly-generic library.
 
-### utils.v
-
-Utilities. Includes e.g. a type for vectors and functions that
-perform operations on them.
-
 ### examples.v
 
-A few examples of using the library.
+A few examples of using the library and it's generic types.
 
-### proofs.v
+## proofs.v
 
 A few proofs of the library.
 
