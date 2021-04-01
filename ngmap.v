@@ -1,11 +1,10 @@
 Require Export init.
 Require Import generic univ utils tactics.
 
-(* Example of a arity-generic and datatype-generic function. *)
+(* Example of an arity-generic and datatype-generic function. *)
 
-(** Definitions for arity-generic datatype-generic map
-    - ngmap is partial so this version uses an error axiom.
-    - a version is that uses sums is included in `optngmap.v`. **)
+(** - ngmap is partial so this version uses an error axiom.
+    - a version that uses sums is included in `optngmap.v`.   **)
 
 (* type definition needed for doubly generic map *)
 Fixpoint nMap {n : nat} (v : vec Type (S n)) : Type :=
