@@ -36,7 +36,7 @@ Polytypic Programming in Coq (Verbruggen, de Vries, Hughes):
 
 Main outcome of this library:
 
-- No exising implementation for doubly-generic programming in Coq.
+- No existing implementation for doubly-generic programming in Coq.
 - Usage of universepolymorfism to avoid --type-in-type.
 
 Main caveats:
@@ -74,4 +74,3 @@ A few examples of using the library and it's generic types.
 ### proofs.v
 
 A few proofs of the library.
-
