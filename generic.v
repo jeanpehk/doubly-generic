@@ -222,40 +222,40 @@ Section terms.
   }.
 
   Definition ngenConst (n : nat) (k : kind) (G : ctx) (b : vec Type (S n) -> Type)
-    (c : const k) (ve : stenv b G) (ce : NGen b)
+    (c : const k) (ve : stenv b G) (cases : NGen b)
     : kit k b (interpToVec (Con c) (transpose ve)).
   Proof.
     pose proof caseCon c (transpose ve) as pc.
     pose proof eqkit _ b pc as pf.
-    destruct ce; destruct c; rewrite <- pc; assumption.
+    destruct cases; destruct c; rewrite <- pc; assumption.
   Defined.
 
   (* term specialization with non-empty context *)
   (* - pretty unreadable.. ways to better automate or simplify logic? *)
   Fixpoint ngen' (n : nat) (b : vec Type (S n) -> Type)
     (G : ctx) (k : kind) (t : typ G k)
-    : forall (ve : stenv b G) (ce : NGen b),
+    : forall (ve : stenv b G) (cases : NGen b),
     kit k b (interpToVec t (transpose ve)) :=
     match t in typ G k
-    return forall ve ce,
+    return forall ve cases,
     kit k b (interpToVec t (transpose ve)) with
-    | Var x => fun ve ce => nlookup x ve
-    | Lam t1 => fun ve ce => curry _ (fun a nwt =>
+    | Var x => fun ve cases => nlookup x ve
+    | Lam t1 => fun ve cases => curry _ (fun a nwt =>
                   eqkit _ _ (caseLam t1 ltac:(auto) a)
-                  (ngen' t1 (ncons a nwt ve) ce))
-    | @App _ _ k2 t1 t2 => fun ve ce =>
+                  (ngen' t1 (ncons a nwt ve) cases))
+    | @App _ _ k2 t1 t2 => fun ve cases =>
         eqkit _ _ (caseApp t1 t2 ltac:(auto))
         (uncurry' (fun a => (forall _,
                        (kit k2 b (zap (interpToVec t1 ltac:(auto)) a))))
-        (ngen' t1 ve ce)
-        (interpToVec t2 ltac:(auto)) (ngen' t2 ve ce))
-    | Con c => fun ve ce => ngenConst c ve ce
+        (ngen' t1 ve cases)
+        (interpToVec t2 ltac:(auto)) (ngen' t2 ve cases))
+    | Con c => fun ve cases => ngenConst c ve cases
     end.
 
   (* term specialization in an empty context. *)
   Definition ngen (n : nat) (b : vec Type (S n) -> Type) (k : kind) (t : ty k)
-  (ce : NGen b) : kit k b (repeat (decodeClosed t)) :=
-  eqkit _ _ ltac:(auto) (ngen' _ nnil ce).
+  (cases : NGen b) : kit k b (repeat (decodeClosed t)) :=
+  eqkit _ _ ltac:(auto) (ngen' _ nnil cases).
 
 End terms.
 
