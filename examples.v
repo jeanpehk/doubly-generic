@@ -49,10 +49,8 @@ Compute decodeClosed (Con Nat).
 (** examples of gmap **)
 
 Compute gmap tprod nat nat (fun a => a + 1) bool bool (fun b => negb b) (1,true).
-(* tmaybe is a self defined type, definition in 'univ.v' *)
 Compute gmap tmaybe _ bool (fun _ => false) (inl tt). (* = inl () *)
 Compute gmap tmaybe nat nat (fun n => n + 1) (inr 3). (* = inr 4 *)
-(* teither is a self defined type, definition in 'univ.v' *)
 Compute gmap teither _ bool (fun _ => false)
                      _ bool (fun _ => true) (inl tt). (* = inl false *)
 
