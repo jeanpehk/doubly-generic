@@ -10,7 +10,7 @@ Usage of a doubly-generic map with the library:
 Compute ngmap 3 tprod
   _ _ _ _ (fun x y z => x + y + z)
   _ _ _ _ (fun x y z => andb (andb x y) z)
-  (11,true) (2, true) (6, true).
+  (11, true) (2, true) (6, true).
 ```
 ```coq
   = (19, true)
